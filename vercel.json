@@ -1,0 +1,12 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "vite",
+  "env": {
+    "VITE_SUPABASE_URL": "https://ftgvxvwvbtfkbgkuccwx.supabase.co",
+    "VITE_SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0Z3Z4dnd2YnRma2Jna3VjY3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwNzEwMjYsImV4cCI6MjA3OTY0NzAyNn0.38ttXMQK9f9Mzi054T-srCIb6uojWTh1ZPDktApdDdY",
+    "VITE_SUPABASE_PROJECT_ID": "ftgvxvwvbtfkbgkuccwx"
+  }
+}

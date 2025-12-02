@@ -1,0 +1,13 @@
+project_id = "ftgvxvwvbtfkbgkuccwx"
+
+[functions.binance-portfolio]
+verify_jwt = false
+
+[functions.analyze-portfolio]
+verify_jwt = false
+
+[functions.suggest-coins]
+verify_jwt = false
+
+[functions.enrich-coin]
+verify_jwt = false
