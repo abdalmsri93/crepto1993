@@ -6,11 +6,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import SuggestCoins from "./pages/SuggestCoins";
+import ProjectDetails from "./pages/ProjectDetails";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
-import DeploymentGuide from "./pages/DeploymentGuide";
 import RecommendationTracking from "./pages/RecommendationTracking";
-import PortfolioRecommendations from "./pages/PortfolioRecommendations";
+import PortfolioRebalance from "./pages/PortfolioRebalance";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import NotFound from "./pages/NotFound";
 
@@ -25,12 +25,12 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/suggest-coins" element={<SuggestCoins />} />
-          <Route path="/portfolio-recommendations" element={<PortfolioRecommendations />} />
+          <Route path="/project/:symbol" element={<ProjectDetails />} />
+          <Route path="/portfolio-rebalance" element={<PortfolioRebalance />} />
           <Route path="/recommendation-tracking" element={<RecommendationTracking />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/confirm-email" element={<ConfirmEmail />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/deployment-guide" element={<DeploymentGuide />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

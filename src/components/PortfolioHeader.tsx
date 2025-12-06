@@ -125,20 +125,6 @@ export const PortfolioHeader = ({
             </p>
           </div>
           
-          <div className="pt-3 border-t border-primary/20">
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground/70 uppercase tracking-wider">اليوم PnL</p>
-              <div className={`flex items-center gap-3 ${parseFloat(totalDayPnL) >= 0 ? 'text-crypto-green' : 'text-red-500'}`}>
-                <span className="text-3xl font-orbitron font-black">
-                  {parseFloat(totalDayPnL) >= 0 ? '+' : ''}{parseFloat(totalDayPnL).toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                </span>
-                <span className="text-2xl font-orbitron font-bold">
-                  ({parseFloat(dayPnLPercent) >= 0 ? '+' : ''}{dayPnLPercent}%)
-                </span>
-              </div>
-            </div>
-          </div>
-          
           <p className="text-xs text-muted-foreground/60 pt-2">
             📅 {new Date(lastUpdate).toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </p>

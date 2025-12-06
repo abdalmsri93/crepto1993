@@ -204,31 +204,6 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Deployment Guide */}
-        <Card className="border-blue-500/20 bg-blue-500/5 backdrop-blur-sm animate-fade-in" style={{ animationDelay: '0.35s' }}>
-          <CardHeader>
-            <CardTitle className="text-right flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-blue-500" />
-              دليل النشر من GitHub
-            </CardTitle>
-            <CardDescription className="text-right">
-              خطوات تفصيلية لنشر التطبيق على Vercel أو Netlify
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground text-right mb-4">
-              إذا كنت ترغب في نشر هذا التطبيق على خادم خاص أو منصة سحابية بعد رفعه على GitHub، 
-              راجع الدليل الشامل الذي يشرح جميع الخطوات المطلوبة.
-            </p>
-            <NavLink to="/deployment-guide">
-              <Button variant="outline" className="w-full gap-2 transition-all duration-300 hover:scale-105">
-                <BookOpen className="w-4 h-4" />
-                عرض دليل النشر الكامل
-              </Button>
-            </NavLink>
-          </CardContent>
-        </Card>
-
         {/* Actions */}
         <div className="flex gap-4 justify-end animate-fade-in" style={{ animationDelay: '0.4s' }}>
           <Button

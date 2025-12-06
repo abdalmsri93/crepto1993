@@ -206,15 +206,9 @@ const Index = () => {
                 الإعدادات
               </Button>
             </NavLink>
-            <NavLink to="/portfolio-recommendations">
-              <Button variant="outline" className="gap-2 transition-all duration-300 hover:scale-105 bg-gradient-to-r from-green-500/10 to-blue-500/10 border-green-500/30 hover:border-green-500/50">
-                ✨ التوصيات المتقدمة
-              </Button>
-            </NavLink>
-            <NavLink to="/recommendation-tracking">
-              <Button variant="outline" className="gap-2 transition-all duration-300 hover:scale-105">
-                <CheckCircle className="w-4 h-4" />
-                تتبع التوصيات
+            <NavLink to="/portfolio-rebalance">
+              <Button variant="outline" className="gap-2 transition-all duration-300 hover:scale-105 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30 hover:border-purple-500/50">
+                📊 موازنة المحفظة
               </Button>
             </NavLink>
           </div>

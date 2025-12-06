@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Brain, TrendingUp, Coins, ListChecks, Target } from "lucide-react";
+import { Loader2, Brain, TrendingUp, Coins, ListChecks } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { CoinEnrichment } from "./CoinEnrichment";
 
@@ -300,7 +300,7 @@ export const PortfolioAnalysis = ({ balances, session }: PortfolioAnalysisProps)
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="current" className="w-full" dir="rtl">
-              <TabsList className="grid w-full grid-cols-4 mb-6">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="current" className="flex items-center gap-2">
                   <Coins className="w-4 h-4" />
                   تحليل العملات
@@ -308,14 +308,6 @@ export const PortfolioAnalysis = ({ balances, session }: PortfolioAnalysisProps)
                 <TabsTrigger value="recommendations" className="flex items-center gap-2">
                   <ListChecks className="w-4 h-4" />
                   التوصيات
-                </TabsTrigger>
-                <TabsTrigger value="strategy" className="flex items-center gap-2">
-                  <Target className="w-4 h-4" />
-                  استراتيجية التنويع
-                </TabsTrigger>
-                <TabsTrigger value="binance" className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  بيانات Binance
                 </TabsTrigger>
               </TabsList>
 
@@ -406,46 +398,6 @@ export const PortfolioAnalysis = ({ balances, session }: PortfolioAnalysisProps)
                     {sections.recommendations || "لا توجد توصيات متاحة"}
                   </div>
                 )}
-              </TabsContent>
-
-              <TabsContent value="strategy" className="space-y-4">
-                <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90 font-cairo" style={{ direction: 'rtl' }}>
-                  {sections.strategy || "لا توجد استراتيجية متاحة"}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="binance" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {binanceStats.map((stat) => {
-                    const isPositive = (stat.priceChangePercent ?? 0) >= 0;
-                    return (
-                      <Card key={stat.asset} className="border-primary/20 bg-background/40">
-                        <CardContent className="p-4 space-y-2" dir="rtl">
-                          <div className="flex items-center justify-between">
-                            <span className="font-orbitron font-semibold text-lg">{stat.asset}</span>
-                            {stat.priceChangePercent !== null && (
-                              <span className={`text-sm font-orbitron ${isPositive ? 'text-crypto-green' : 'text-red-500'}`}>
-                                {isPositive ? '+' : ''}{stat.priceChangePercent.toFixed(2)}%
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            <span>قيمة المركز التقريبية</span>
-                            <span className="font-orbitron text-foreground font-semibold">
-                              ${stat.usdValue.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            <span>نسبة من إجمالي المحفظة</span>
-                            <span className="font-orbitron text-foreground font-semibold">
-                              {stat.allocation.toFixed(2)}%
-                            </span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
