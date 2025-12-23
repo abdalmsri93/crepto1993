@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إنشاء جداول Supabase</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      transition: border-color 0.3s;
+    }
+    
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 30px;
+    }
+    
+    button {
+      flex: 1;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+    }
+    
+    .btn-secondary:hover {
+      background: #eee;
+    }
+    
+    .output {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+      display: none;
+    }
+    
+    .output.show {
+      display: block;
+    }
+    
+    .output.success {
+      border-left-color: #10b981;
+      background: #f0fdf4;
+    }
+    
+    .output.error {
+      border-left-color: #ef4444;
+      background: #fef2f2;
+    }
+    
+    .output-text {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #333;
+    }
+    
+    .output.success .output-text {
+      color: #059669;
+    }
+    
+    .output.error .output-text {
+      color: #dc2626;
+    }
+    
+    .loader {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+    }
+    
+    .loader.show {
+      display: block;
+    }
+    
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
+      color: #1e40af;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 إعداد قاعدة البيانات</h1>
+    <p class="subtitle">إنشاء جداول Binance Watch Live في Supabase</p>
+    
+    <div class="info-box">
+      <strong>📋 خطوات:</strong><br>
+      1. أدخل Service Role Key من Supabase<br>
+      2. اضغط "إنشاء الجداول"<br>
+      3. انتظر النتيجة
+    </div>
+    
+    <form id="setupForm">
+      <div class="form-group">
+        <label for="serviceRoleKey">Service Role Key</label>
+        <textarea 
+          id="serviceRoleKey" 
+          placeholder="ضع Service Role Key هنا (من Supabase Dashboard → Settings → API)"
+          required></textarea>
+        <small style="color: #999; margin-top: 4px; display: block;">
+          أين تجده: Supabase Dashboard → اختر المشروع → Settings → API → service_role secret
+        </small>
+      </div>
+      
+      <div class="button-group">
+        <button type="submit" class="btn-primary">إنشاء الجداول</button>
+        <button type="reset" class="btn-secondary">مسح</button>
+      </div>
+    </form>
+    
+    <div class="loader" id="loader">
+      <div class="spinner"></div>
+      <p>جاري إنشاء الجداول...</p>
+    </div>
+    
+    <div class="output" id="output">
+      <div class="output-text" id="outputText"></div>
+    </div>
+  </div>
+
+  <script>
+    const PROJECT_ID = 'ftgvxvwvbtfkbgkuccwx';
+    const PROJECT_URL = `https://${PROJECT_ID}.supabase.co`;
+    
+    const SQL = `
+-- جدول المفاتيح المشفرة
+CREATE TABLE IF NOT EXISTS encrypted_binance_keys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  encrypted_api_key TEXT NOT NULL,
+  encrypted_secret_key TEXT NOT NULL,
+  api_key_hash VARCHAR(255) NOT NULL UNIQUE,
+  ip_whitelist TEXT[] DEFAULT ARRAY[]::TEXT[],
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_used TIMESTAMP WITH TIME ZONE,
+  is_active BOOLEAN DEFAULT true,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- جدول سجل الصفقات
+CREATE TABLE IF NOT EXISTS trade_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  symbol VARCHAR(20) NOT NULL,
+  side VARCHAR(10) NOT NULL CHECK (side IN ('BUY', 'SELL')),
+  quantity DECIMAL(18, 8) NOT NULL,
+  price DECIMAL(18, 2) NOT NULL,
+  total DECIMAL(18, 2) NOT NULL,
+  fee DECIMAL(18, 8) DEFAULT 0,
+  fee_asset VARCHAR(20),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')),
+  binance_order_id VARCHAR(100),
+  execution_time TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- جدول أخطاء الصفقات
+CREATE TABLE IF NOT EXISTS trade_errors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  error_code VARCHAR(50),
+  error_message TEXT NOT NULL,
+  trade_params JSONB,
+  binance_response JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- جدول سجل أنشطة التشفير
+CREATE TABLE IF NOT EXISTS encryption_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  action VARCHAR(50) NOT NULL,
+  ip_address INET,
+  user_agent TEXT,
+  success BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- فهارس للأداء
+CREATE INDEX IF NOT EXISTS idx_encrypted_keys_user_id ON encrypted_binance_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_trade_history_user_id ON trade_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_trade_history_symbol ON trade_history(symbol);
+CREATE INDEX IF NOT EXISTS idx_trade_history_created_at ON trade_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_trade_errors_user_id ON trade_errors(user_id);
+CREATE INDEX IF NOT EXISTS idx_encryption_logs_user_id ON encryption_logs(user_id);
+
+-- RLS للمفاتيح
+ALTER TABLE encrypted_binance_keys ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY IF NOT EXISTS "Users can view their own API keys"
+  ON encrypted_binance_keys FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can insert their own API keys"
+  ON encrypted_binance_keys FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can update their own API keys"
+  ON encrypted_binance_keys FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can delete their own API keys"
+  ON encrypted_binance_keys FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- RLS لسجل الصفقات
+ALTER TABLE trade_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY IF NOT EXISTS "Users can view their own trades"
+  ON trade_history FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can insert their own trades"
+  ON trade_history FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can update their own trades"
+  ON trade_history FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- RLS لأخطاء الصفقات
+ALTER TABLE trade_errors ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY IF NOT EXISTS "Users can view their own trade errors"
+  ON trade_errors FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can insert their own trade errors"
+  ON trade_errors FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- RLS لسجل التشفير
+ALTER TABLE encryption_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY IF NOT EXISTS "Users can view their own logs"
+  ON encryption_logs FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can insert their own logs"
+  ON encryption_logs FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+`;
+
+    const form = document.getElementById('setupForm');
+    const loader = document.getElementById('loader');
+    const output = document.getElementById('output');
+    const outputText = document.getElementById('outputText');
+    const keyInput = document.getElementById('serviceRoleKey');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const serviceRoleKey = keyInput.value.trim();
+      
+      if (!serviceRoleKey) {
+        showError('❌ الرجاء إدخال Service Role Key');
+        return;
+      }
+      
+      loader.classList.add('show');
+      output.classList.remove('show', 'success', 'error');
+      
+      try {
+        const response = await fetch(`${PROJECT_URL}/rest/v1/rpc/sql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({ query: SQL })
+        });
+        
+        loader.classList.remove('show');
+        
+        if (response.ok) {
+          showSuccess('✅ تم إنشاء الجداول بنجاح!\n\n✨ يمكنك الآن استخدام التطبيق وإدخال مفاتيح Binance API');
+        } else {
+          const error = await response.text();
+          showError(`❌ خطأ (${response.status}):\n${error}`);
+        }
+      } catch (error) {
+        loader.classList.remove('show');
+        showError(`❌ خطأ في الاتصال:\n${error.message}`);
+      }
+    });
+
+    function showSuccess(message) {
+      output.classList.add('show', 'success');
+      outputText.textContent = message;
+    }
+
+    function showError(message) {
+      output.classList.add('show', 'error');
+      outputText.textContent = message;
+    }
+  </script>
+</body>
+</html>
