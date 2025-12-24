@@ -164,7 +164,7 @@ const Auth = () => {
           style={{ animationDelay: '0.2s' }}
         >
           <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-4 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+          <div className="flex items-center justify-center gap-2 mb-4 animate-fade-in animate-delay-300">
             <TrendingUp className="w-10 h-10 text-primary transition-transform duration-300 hover:scale-110" />
             <h1 className="text-3xl font-bold bg-gradient-to-l from-primary via-accent to-primary bg-clip-text text-transparent">
               محفظة العملات

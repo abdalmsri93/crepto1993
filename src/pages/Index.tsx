@@ -198,7 +198,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 animate-fade-in">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex justify-between items-center gap-4 animate-fade-in flex-wrap" style={{ animationDelay: '0.1s' }}>
+        <div className="mb-6 flex justify-between items-center gap-4 animate-fade-in flex-wrap animate-delay-100">
           <div className="flex gap-2">
             <NavLink to="/settings">
               <Button variant="outline" className="gap-2 transition-all duration-300 hover:scale-105">
