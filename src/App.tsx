@@ -23,7 +23,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<Auth />} />
+          <Route path="/portfolio" element={<Index />} />
           <Route path="/suggest-coins" element={<SuggestCoins />} />
           <Route path="/project/:symbol" element={<ProjectDetails />} />
           <Route path="/portfolio-rebalance" element={<PortfolioRebalance />} />

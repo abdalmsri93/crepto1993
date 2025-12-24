@@ -63,7 +63,10 @@ const Index = () => {
   }, [navigate]);
 
   const fetchPortfolio = async () => {
-    if (!session) return;
+    if (!session) {
+      setIsLoading(false);
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -103,6 +106,7 @@ const Index = () => {
     } catch (error: any) {
       console.error('Failed to fetch portfolio:', error);
       setConnectionStatus('disconnected');
+      setIsLoading(false);
       
       if (error.message?.includes('not configured')) {
         toast({
