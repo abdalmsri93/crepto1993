@@ -17,6 +17,7 @@ const Settings = () => {
   const [groqApiKey, setGroqApiKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const [isTestingAPI, setIsTestingAPI] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -98,6 +99,60 @@ const Settings = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/auth");
+  };
+
+  const testGroqAPI = async () => {
+    if (!groqApiKey.trim()) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال Groq API Key أولاً",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTestingAPI(true);
+    
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            {
+              role: 'user',
+              content: 'Say "API works!" in Arabic'
+            }
+          ],
+          max_tokens: 50,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      toast({
+        title: "✅ نجح الاختبار!",
+        description: "Groq API يعمل بشكل صحيح: " + data.choices[0].message.content,
+      });
+    } catch (error: any) {
+      console.error('Test Error:', error);
+      toast({
+        title: "❌ فشل الاختبار",
+        description: error.message || "تحقق من صحة المفتاح",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTestingAPI(false);
+    }
   };
 
   if (isFetching) {
@@ -234,14 +289,38 @@ const Settings = () => {
               <label className="text-sm font-medium text-right block">
                 Groq API Key
               </label>
-              <Input
-                type="password"
-                value={groqApiKey}
-                onChange={(e) => setGroqApiKey(e.target.value)}
-                placeholder="gsk_xxxxxxxxxxxxxxxxxxxxx"
-                className="text-right font-mono transition-all duration-300 focus:scale-[1.02]"
-                dir="ltr"
-              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={testGroqAPI}
+                  disabled={isTestingAPI || !groqApiKey.trim()}
+                  className="shrink-0"
+                >
+                  {isTestingAPI ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                      اختبار...
+                    </>
+                  ) : (
+                    <>
+                      ✓ اختبار
+                    </>
+                  )}
+                </Button>
+                <Input
+                  type="password"
+                  value={groqApiKey}
+                  onChange={(e) => setGroqApiKey(e.target.value)}
+                  placeholder="gsk_xxxxxxxxxxxxxxxxxxxxx"
+                  className="text-right font-mono transition-all duration-300 focus:scale-[1.02] flex-1"
+                  dir="ltr"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground text-right">
+                💡 اضغط "اختبار" للتأكد من صحة المفتاح قبل الحفظ
+              </p>
             </div>
 
             <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/30 space-y-3">

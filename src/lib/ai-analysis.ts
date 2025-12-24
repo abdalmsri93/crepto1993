@@ -63,6 +63,9 @@ SUMMARY: [ملخص قصير جداً 10-15 كلمة]
 `;
 
   try {
+    console.log('🤖 Starting AI analysis for:', coinData.symbol);
+    console.log('📊 Model:', model);
+    
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -86,11 +89,17 @@ SUMMARY: [ملخص قصير جداً 10-15 كلمة]
       }),
     });
 
+    console.log('📡 Response status:', response.status);
+    
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ API Error Response:', errorText);
+      throw new Error(`API Error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('✅ API Response received for:', coinData.symbol);
+    
     const analysis = data.choices[0].message.content;
 
     // Parse the response
@@ -187,17 +196,22 @@ export async function getDualAIAnalysis(coinData: CoinData): Promise<DualAnalysi
 
   // Analyze with both models in parallel
   try {
-    const [chatgptAnalysis, geminiAnalysis] = await Promise.all([
-      analyzeWithGroq(coinData, 'llama-3.1-70b-versatile'), // ChatGPT-like
-      analyzeWithGroq(coinData, 'mixtral-8x7b-32768'),      // Gemini-like
-    ]);
+    console.log('🔄 Starting dual AI analysis...');
+    
+    // Use supported models: llama-3.3-70b-versatile & llama-3.1-8b-instant
+    const chatgptAnalysis = await analyzeWithGroq(coinData, 'llama-3.3-70b-versatile');
+    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+    const geminiAnalysis = await analyzeWithGroq(coinData, 'llama-3.1-8b-instant');
 
+    console.log('✅ Dual analysis complete');
+    
     return {
       chatgpt: chatgptAnalysis,
       gemini: geminiAnalysis,
       isLoading: false
     };
   } catch (error: any) {
+    console.error('❌ Dual analysis failed:', error);
     const basic = getBasicAnalysis(coinData);
     return {
       chatgpt: basic,
