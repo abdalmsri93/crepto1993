@@ -122,10 +122,7 @@ const SuggestCoins = () => {
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
-      if (!currentSession) {
-        navigate("/auth");
-        return;
-      }
+      // السماح بالدخول حتى بدون تسجيل دخول
       setSession(currentSession);
     };
 
@@ -133,9 +130,7 @@ const SuggestCoins = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (!session) {
-        navigate("/auth");
-      }
+      // السماح بالبقاء في الصفحة حتى بدون جلسة
     });
 
     return () => subscription.unsubscribe();

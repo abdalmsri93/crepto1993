@@ -82,7 +82,10 @@ const Index = () => {
       if (error) {
         console.error('Error fetching portfolio:', error);
         setConnectionStatus('disconnected');
-        throw error;
+        // لا نرمي الخطأ - نسمح بعرض الواجهة الفارغة
+        setPortfolio({ balances: [], totalValue: '0', lastUpdate: new Date().toISOString() });
+        setIsLoading(false);
+        return;
       }
 
       console.log('Portfolio data received:', data);
@@ -108,17 +111,18 @@ const Index = () => {
       setConnectionStatus('disconnected');
       setIsLoading(false);
       
+      // عرض محفظة فارغة بدلاً من البقاء في حالة خطأ
+      setPortfolio({ balances: [], totalValue: '0', lastUpdate: new Date().toISOString() });
+      
       if (error.message?.includes('not configured')) {
         toast({
           title: "مفاتيح API غير موجودة",
           description: "يرجى إضافة مفاتيح Binance API في صفحة الإعدادات",
-          variant: "destructive",
         });
       } else {
         toast({
-          title: "خطأ في التحديث",
-          description: error.message || "فشل في تحميل بيانات المحفظة",
-          variant: "destructive",
+          title: "تنبيه",
+          description: "لم يتم العثور على بيانات المحفظة. يمكنك البدء بإضافة مفاتيح API أو استكشاف العملات",
         });
       }
     } finally {
