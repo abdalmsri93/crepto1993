@@ -14,6 +14,7 @@ const Settings = () => {
   const [fullName, setFullName] = useState("");
   const [binanceApiKey, setBinanceApiKey] = useState("");
   const [binanceApiSecret, setBinanceApiSecret] = useState("");
+  const [groqApiKey, setGroqApiKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const navigate = useNavigate();
@@ -43,6 +44,12 @@ const Settings = () => {
         setBinanceApiSecret(profile.binance_api_secret || "");
       }
 
+      // Load Groq API Key from localStorage
+      const savedGroqKey = localStorage.getItem('groq_api_key');
+      if (savedGroqKey) {
+        setGroqApiKey(savedGroqKey);
+      }
+
       setIsFetching(false);
     };
 
@@ -65,6 +72,13 @@ const Settings = () => {
         .eq("id", user.id);
 
       if (error) throw error;
+
+      // Save Groq API Key to localStorage
+      if (groqApiKey.trim()) {
+        localStorage.setItem('groq_api_key', groqApiKey.trim());
+      } else {
+        localStorage.removeItem('groq_api_key');
+      }
 
       toast({
         title: "تم الحفظ بنجاح",
@@ -200,6 +214,56 @@ const Settings = () => {
               <p className="text-sm text-right text-muted-foreground">
                 ⚠️ <strong>ملاحظة هامة:</strong> مفاتيح API الخاصة بك محمية ومشفرة. لن يتمكن أحد غيرك من الوصول إليها.
               </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Groq AI API Key */}
+        <Card className="border-green-500/20 bg-gradient-to-br from-green-500/5 to-blue-500/5 backdrop-blur-sm animate-fade-in" style={{ animationDelay: '0.35s' }}>
+          <CardHeader>
+            <div className="flex items-center justify-end gap-2">
+              <CardTitle className="text-right">مفتاح Groq AI (تحليل ذكي)</CardTitle>
+              <span className="text-2xl">🤖</span>
+            </div>
+            <CardDescription className="text-right">
+              للحصول على تحليل AI مزدوج (ChatGPT-like & Gemini-like) للعملات - مجاني 100%
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-right block">
+                Groq API Key
+              </label>
+              <Input
+                type="password"
+                value={groqApiKey}
+                onChange={(e) => setGroqApiKey(e.target.value)}
+                placeholder="gsk_xxxxxxxxxxxxxxxxxxxxx"
+                className="text-right font-mono transition-all duration-300 focus:scale-[1.02]"
+                dir="ltr"
+              />
+            </div>
+
+            <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/30 space-y-3">
+              <div className="flex items-start gap-3 text-right">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-green-600 dark:text-green-400 mb-2">
+                    ✨ كيفية الحصول على المفتاح المجاني:
+                  </p>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>اذهب إلى: <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">console.groq.com</a></li>
+                    <li>سجل حساب مجاني (Gmail/GitHub)</li>
+                    <li>اذهب إلى "API Keys"</li>
+                    <li>اضغط "Create API Key"</li>
+                    <li>انسخ المفتاح وألصقه هنا</li>
+                  </ol>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-green-500/20">
+                <p className="text-xs text-muted-foreground text-right">
+                  🚀 <strong>مميزات:</strong> تحليل مزدوج من نموذجين مختلفين • سرعة فائقة • مجاني تماماً
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

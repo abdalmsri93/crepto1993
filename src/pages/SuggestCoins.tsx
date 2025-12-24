@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Sparkles, ArrowRight, ExternalLink, Info } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { getDualAIAnalysis, isAIConfigured } from "@/lib/ai-analysis";
+import type { DualAnalysis } from "@/lib/ai-analysis";
 
 // 🔧 دالة لحساب معايير Binance تلقائياً من البيانات الحية
 function calculateBinanceMetrics(ticker: any, allTickers: any[]) {
@@ -92,18 +94,21 @@ interface CoinSuggestion {
   links?: {
     website?: string;
   };
+  aiAnalysis?: DualAnalysis;
 }
 
 const SuggestCoins = () => {
   const [coins, setCoins] = useState<CoinSuggestion[]>([]);
   const [notes, setNotes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentAssets, setCurrentAssets] = useState<string[]>([]);
   const [investmentAmount, setInvestmentAmount] = useState<string>("");
   const [minPrice, setMinPrice] = useState<string>("0.10");
   const [maxPrice, setMaxPrice] = useState<string>("10");
   const [coinCount, setCoinCount] = useState<string>("5");
   const [session, setSession] = useState<any>(null);
+  const [aiConfigured, setAiConfigured] = useState(false);
   
   // الفلاتر المتقدمة (مخفية في Accordion)
   const [advancedFilters, setAdvancedFilters] = useState({
@@ -406,6 +411,11 @@ const SuggestCoins = () => {
             ? `تم توزيع $${totalAmount.toFixed(2)} على ${selectedCoins.length} عملات حسب الأداء`
             : `تم الحصول على ${selectedCoins.length} عملات جديدة من Binance`,
         });
+
+        // Start AI analysis automatically if configured
+        if (isAIConfigured()) {
+          analyzeCoinsWithAI(selectedCoins as CoinSuggestion[]);
+        }
       } catch (fetchError) {
         console.error("Error:", fetchError);
         throw new Error("فشل في جلب البيانات من Binance");
@@ -421,6 +431,53 @@ const SuggestCoins = () => {
       setIsLoading(false);
     }
   };
+
+  // Analyze coins with AI
+  const analyzeCoinsWithAI = async (coinsToAnalyze: CoinSuggestion[]) => {
+    setIsAnalyzing(true);
+    toast({
+      title: "🤖 جاري تحليل العملات بالذكاء الاصطناعي",
+      description: "هذا قد يستغرق بضع ثوان...",
+    });
+
+    const updatedCoins: CoinSuggestion[] = [];
+
+    for (const coin of coinsToAnalyze) {
+      const analysis = await getDualAIAnalysis({
+        symbol: coin.symbol,
+        price: coin.price,
+        growth: coin.growth,
+        riskLevel: coin.riskLevel,
+        liquidity: coin.liquidity,
+        performanceScore: coin.performanceScore,
+        marketCap: coin.marketCap,
+        project: coin.project,
+        recommendation: coin.recommendation,
+      });
+
+      updatedCoins.push({
+        ...coin,
+        aiAnalysis: analysis,
+      });
+
+      // Update coins in real-time
+      setCoins([...updatedCoins]);
+      
+      // Delay to avoid rate limits (2 seconds between requests)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    setIsAnalyzing(false);
+    toast({
+      title: "✅ اكتمل التحليل الذكي",
+      description: `تم تحليل ${updatedCoins.length} عملة بواسطة AI`,
+    });
+  };
+
+  // Check if AI is configured on mount
+  useEffect(() => {
+    setAiConfigured(isAIConfigured());
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95 p-4 md:p-8">
@@ -447,6 +504,44 @@ const SuggestCoins = () => {
             <CardTitle className="text-right">🔍 شروط البحث</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* AI Configuration Alert */}
+            {!aiConfigured && (
+              <div className="mb-6 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-lg">
+                <div className="flex items-start gap-3 text-right">
+                  <span className="text-2xl">🤖</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-1">
+                      💡 تحليل ذكي متاح (مجاني)!
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      احصل على تحليل مزدوج من ChatGPT و Gemini لكل عملة - مجاني تماماً!
+                    </p>
+                    <NavLink to="/settings">
+                      <Button size="sm" variant="outline" className="text-xs">
+                        ⚙️ تفعيل التحليل الذكي
+                      </Button>
+                    </NavLink>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isAnalyzing && (
+              <div className="mb-6 p-4 bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/30 rounded-lg">
+                <div className="flex items-center gap-3 text-right">
+                  <Loader2 className="w-5 h-5 animate-spin text-green-500" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                      🤖 جاري تحليل العملات بالذكاء الاصطناعي...
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      يتم تحليل كل عملة بواسطة نموذجين مختلفين (ChatGPT-like & Gemini-like)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-6">
               {/* نطاق السعر */}
               <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-4 rounded-lg">
@@ -720,7 +815,12 @@ const SuggestCoins = () => {
           <div className="space-y-4">
             <div className="flex gap-2">
               {coins.map((coin, i) => (
-                <Card key={i} className="flex-1">
+                <Card key={i} className="flex-1 relative">
+                  {coin.aiAnalysis?.isLoading && (
+                    <div className="absolute top-2 left-2 z-10">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    </div>
+                  )}
                   <CardContent className="p-4">
                     <div className="text-right">
                       <div className="font-semibold">{coin.symbol}</div>
@@ -730,6 +830,33 @@ const SuggestCoins = () => {
                       </div>
                       <div className="text-xs mt-2">{coin.riskLevel}</div>
                       <div className="text-xs">{coin.recommendation}</div>
+                      
+                      {/* AI Analysis Results */}
+                      {coin.aiAnalysis && !coin.aiAnalysis.isLoading && (
+                        <div className="mt-3 space-y-2">
+                          {/* ChatGPT Analysis */}
+                          <div className={`p-2 rounded border ${coin.aiAnalysis.chatgpt.recommended ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                            <div className="flex items-center gap-1 mb-1">
+                              <span className="text-xs font-bold">🧠 ChatGPT:</span>
+                              <span className={`text-xs font-semibold ${coin.aiAnalysis.chatgpt.recommended ? 'text-green-600' : 'text-red-600'}`}>
+                                {coin.aiAnalysis.chatgpt.recommended ? '✅ يُنصح' : '❌ لا يُنصح'}
+                              </span>
+                            </div>
+                            <p className="text-xs opacity-80">{coin.aiAnalysis.chatgpt.reason}</p>
+                          </div>
+                          
+                          {/* Gemini Analysis */}
+                          <div className={`p-2 rounded border ${coin.aiAnalysis.gemini.recommended ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                            <div className="flex items-center gap-1 mb-1">
+                              <span className="text-xs font-bold">✨ Gemini:</span>
+                              <span className={`text-xs font-semibold ${coin.aiAnalysis.gemini.recommended ? 'text-green-600' : 'text-red-600'}`}>
+                                {coin.aiAnalysis.gemini.recommended ? '✅ يُنصح' : '❌ لا يُنصح'}
+                              </span>
+                            </div>
+                            <p className="text-xs opacity-80">{coin.aiAnalysis.gemini.reason}</p>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* عرض المبلغ والنسبة المئوية */}
                       {coin.suggestedAmount && (
