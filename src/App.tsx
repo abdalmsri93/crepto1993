@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import RecommendationTracking from "./pages/RecommendationTracking";
 import PortfolioRebalance from "./pages/PortfolioRebalance";
 import ConfirmEmail from "./pages/ConfirmEmail";
+import Favorites from "./pages/Favorites";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/portfolio" element={<Index />} />
           <Route path="/suggest-coins" element={<SuggestCoins />} />
+          <Route path="/favorites" element={<Favorites />} />
           <Route path="/project/:symbol" element={<ProjectDetails />} />
           <Route path="/portfolio-rebalance" element={<PortfolioRebalance />} />
           <Route path="/recommendation-tracking" element={<RecommendationTracking />} />

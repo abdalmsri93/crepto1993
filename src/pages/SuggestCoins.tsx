@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, ArrowRight, ExternalLink, Info } from "lucide-react";
+import { useFavorites } from "@/hooks/useFavorites";
+import { Loader2, Sparkles, ArrowRight, ExternalLink, Info, Star } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { getDualAIAnalysis, isAIConfigured } from "@/lib/ai-analysis";
 import type { DualAnalysis } from "@/lib/ai-analysis";
@@ -108,6 +109,7 @@ const SuggestCoins = () => {
   const [maxPrice, setMaxPrice] = useState<string>("10");
   const [coinCount, setCoinCount] = useState<string>("5");
   const [session, setSession] = useState<any>(null);
+  const { toggleFavorite, isFavorite } = useFavorites();
   const [aiConfigured, setAiConfigured] = useState(false);
   
   // الفلاتر المتقدمة (مخفية في Accordion)
@@ -491,12 +493,20 @@ const SuggestCoins = () => {
               جلب آخر العملات الحية من Binance مع الشروط المتقدمة
             </p>
           </div>
-          <NavLink to="/">
-            <Button variant="outline" className="gap-2">
-              <ArrowRight className="w-4 h-4" />
-              العودة
-            </Button>
-          </NavLink>
+          <div className="flex gap-2">
+            <NavLink to="/">
+              <Button variant="outline" className="gap-2">
+                <ArrowRight className="w-4 h-4" />
+                العودة
+              </Button>
+            </NavLink>
+            <NavLink to="/favorites">
+              <Button variant="outline" className="gap-2 border-yellow-500/30 hover:border-yellow-500">
+                <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                مفضلاتي
+              </Button>
+            </NavLink>
+          </div>
         </div>
 
         <Card className="border-primary/20 bg-card/50">
@@ -870,6 +880,20 @@ const SuggestCoins = () => {
                         </div>
                       )}
                       <div className="flex gap-2 mt-3">
+                        <Button
+                          size="sm"
+                          variant={isFavorite(coin.symbol) ? "default" : "outline"}
+                          className={`flex-1 text-xs transition-colors ${isFavorite(coin.symbol) ? 'bg-yellow-500/80 hover:bg-yellow-600 text-white' : ''}`}
+                          onClick={() => toggleFavorite({
+                            symbol: coin.symbol,
+                            name: coin.name,
+                            price: coin.price,
+                            priceChange: parseFloat(coin.growth),
+                          })}
+                        >
+                          <Star className={`w-3 h-3 ml-1 ${isFavorite(coin.symbol) ? 'fill-current' : ''}`} />
+                          {isFavorite(coin.symbol) ? 'مفضلة' : 'إضافة'}
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
