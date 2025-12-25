@@ -1,6 +1,7 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, ExternalLink } from "lucide-react";
+import { TrendingUp, ExternalLink, Calendar, Tag, Loader2 } from "lucide-react";
+import { useCoinMetadata } from "@/hooks/useCoinMetadata";
 
 interface AssetCardProps {
   asset: string;
@@ -39,6 +40,9 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const percentage = priceChangePercent ? parseFloat(priceChangePercent) : 0;
   const isPositive = percentage >= 0;
   const logoUrl = COIN_LOGOS[asset] || "https://cryptologos.cc/logos/generic-crypto-logo.png";
+  
+  // جلب بيانات العملة من الـ APIs
+  const { launchDate, category, loading, error } = useCoinMetadata(asset);
   
   const handleAssetClick = () => {
     const binanceUrl = getBinanceUrl(asset);
@@ -91,6 +95,48 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
               {parseFloat(total).toFixed(8)}
             </span>
           </div>
+          
+          {/* الفئة وتاريخ الإصدار */}
+          {loading ? (
+            <div className="flex justify-center items-center py-3 px-2">
+              <Loader2 className="w-4 h-4 animate-spin text-primary mr-2" />
+              <span className="text-xs text-muted-foreground">جاري التحميل...</span>
+            </div>
+          ) : !launchDate && !category ? (
+            <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
+              <span className="text-muted-foreground/80 text-sm font-medium">معلومات</span>
+              <span className="text-xs text-amber-500 font-semibold">
+                غير متوفر
+              </span>
+            </div>
+          ) : (
+            <>
+              {category && (
+                <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
+                  <div className="flex items-center gap-1.5 text-muted-foreground/80 text-sm font-medium">
+                    <Tag className="w-3.5 h-3.5" />
+                    الفئة
+                  </div>
+                  <span className="bg-gradient-to-r from-primary/20 to-secondary/20 px-2.5 py-1 rounded-full text-xs font-semibold text-primary">
+                    {category}
+                  </span>
+                </div>
+              )}
+              
+              {launchDate && (
+                <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
+                  <div className="flex items-center gap-1.5 text-muted-foreground/80 text-sm font-medium">
+                    <Calendar className="w-3.5 h-3.5" />
+                    تاريخ الإصدار
+                  </div>
+                  <span className="font-orbitron text-crypto-green text-sm font-semibold">
+                    {launchDate}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+          
           <div className="flex justify-between items-end bg-gradient-to-r from-primary/10 to-secondary/10 px-3 py-3 rounded-lg border border-primary/20">
             <span className="text-muted-foreground/80 text-sm font-medium">القيمة الإجمالية</span>
             <span className="font-orbitron text-crypto-gold text-lg font-black transition-all duration-300 group-hover:scale-125 origin-right inline-block">

@@ -4,6 +4,7 @@ export interface CoinData {
   symbol: string;
   name: string;
   category: string;
+  launch_date: string;
   price_range: string;
   market_cap: string;
   sharia_compliant: boolean;
@@ -38,6 +39,7 @@ export const COINS_DATABASE: Record<string, CoinData> = {
     symbol: "BTC",
     name: "Bitcoin",
     category: "Layer 1",
+    launch_date: "3 يناير 2009",
     price_range: "$40,000-$100,000",
     market_cap: "$800B+",
     sharia_compliant: true,
@@ -70,6 +72,7 @@ export const COINS_DATABASE: Record<string, CoinData> = {
     symbol: "ETH",
     name: "Ethereum",
     category: "Layer 1 Smart Contracts",
+    launch_date: "30 يوليو 2015",
     price_range: "$2,000-$5,000",
     market_cap: "$300B+",
     sharia_compliant: true,
@@ -102,6 +105,7 @@ export const COINS_DATABASE: Record<string, CoinData> = {
     symbol: "BNB",
     name: "Binance Coin",
     category: "Exchange Token / Layer 1",
+    launch_date: "25 يونيو 2017",
     price_range: "$300-$700",
     market_cap: "$50B+",
     sharia_compliant: true,
@@ -134,6 +138,7 @@ export const COINS_DATABASE: Record<string, CoinData> = {
     symbol: "SOL",
     name: "Solana",
     category: "Layer 1 High-Speed",
+    launch_date: "10 مارس 2020",
     price_range: "$30-$150",
     market_cap: "$60B+",
     sharia_compliant: true,
@@ -166,6 +171,7 @@ export const COINS_DATABASE: Record<string, CoinData> = {
     symbol: "ADA",
     name: "Cardano",
     category: "Layer 1 Smart Contracts",
+    launch_date: "29 سبتمبر 2015",
     price_range: "$0.5-$1.5",
     market_cap: "$20B+",
     sharia_compliant: true,
@@ -198,6 +204,7 @@ export const COINS_DATABASE: Record<string, CoinData> = {
     symbol: "DOGE",
     name: "Dogecoin",
     category: "Memecoin / Payment",
+    launch_date: "6 ديسمبر 2013",
     price_range: "$0.10-$0.50",
     market_cap: "$15B+",
     sharia_compliant: true,
@@ -229,6 +236,7 @@ export const COINS_DATABASE: Record<string, CoinData> = {
     symbol: "XRP",
     name: "Ripple",
     category: "Payment Protocol",
+    launch_date: "24 يناير 2012",
     price_range: "$2-$5",
     market_cap: "$25B+",
     sharia_compliant: true,
@@ -261,6 +269,7 @@ export const COINS_DATABASE: Record<string, CoinData> = {
     symbol: "LTC",
     name: "Litecoin",
     category: "Layer 1 Payment",
+    launch_date: "7 أكتوبر 2011",
     price_range: "$100-$300",
     market_cap: "$15B+",
     sharia_compliant: true,
@@ -292,6 +301,7 @@ export const COINS_DATABASE: Record<string, CoinData> = {
     symbol: "MATIC",
     name: "Polygon",
     category: "Layer 2 Solution",
+    launch_date: "28 يوليو 2017",
     price_range: "$0.5-$2",
     market_cap: "$8B+",
     sharia_compliant: true,
