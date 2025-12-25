@@ -8,6 +8,12 @@
 
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -189,24 +195,57 @@ async function analyzeWithGemini(coin) {
 }
 
 /**
- * إضافة العملة للمفضلات في قاعدة البيانات
+ * إضافة العملة للمفضلات في قاعدة البيانات وملف JSON محلي
  */
 async function addToFavorites(coin) {
+  const favoritesFilePath = path.join(__dirname, 'public', 'auto-favorites.json');
+  
   try {
-    const { error } = await supabase
-      .from('favorites')
-      .insert({
-        symbol: coin.symbol,
-        name: coin.name,
-        price: coin.price,
-        priceChange: coin.priceChange,
-        addedAt: new Date().toISOString(),
-        source: 'auto-search',
-      });
+    // قراءة الملف الحالي أو إنشاء قائمة جديدة
+    let currentFavorites = [];
+    try {
+      if (fs.existsSync(favoritesFilePath)) {
+        const data = fs.readFileSync(favoritesFilePath, 'utf8');
+        currentFavorites = JSON.parse(data);
+      }
+    } catch (e) {
+      currentFavorites = [];
+    }
 
-    if (error) throw error;
+    // التحقق من عدم وجود العملة مسبقاً
+    const exists = currentFavorites.some(f => f.symbol === coin.symbol + 'USDT');
+    if (exists) {
+      console.log(`ℹ️ ${coin.symbol} موجودة مسبقاً في المفضلات`);
+      return false;
+    }
+
+    // إنشاء كائن العملة بالتنسيق المطلوب للموقع
+    const favoriteEntry = {
+      symbol: coin.symbol + 'USDT',
+      name: coin.name || coin.symbol,
+      price: coin.price,
+      priceChange24h: coin.priceChange,
+      volume24h: coin.volume || 0,
+      marketCap: 0,
+      rank: currentFavorites.length + 1,
+      growth: `${coin.priceChange > 0 ? '+' : ''}${coin.priceChange.toFixed(2)}%`,
+      liquidity: coin.volume > 100000000 ? 'عالية جداً' : coin.volume > 10000000 ? 'عالية' : 'متوسطة',
+      riskLevel: Math.abs(coin.priceChange) > 10 ? 'عالي' : Math.abs(coin.priceChange) > 5 ? 'متوسط' : 'منخفض',
+      valueScore: '70/100',
+      isHalal: true,
+      category: '🔍 بحث تلقائي',
+      addedAt: new Date().toISOString(),
+      source: 'auto-search'
+    };
+
+    // إضافة للقائمة
+    currentFavorites.push(favoriteEntry);
+
+    // حفظ الملف
+    fs.mkdirSync(path.dirname(favoritesFilePath), { recursive: true });
+    fs.writeFileSync(favoritesFilePath, JSON.stringify(currentFavorites, null, 2), 'utf8');
     
-    console.log(`✅ تمت إضافة ${coin.symbol} للمفضلات`);
+    console.log(`✅ تمت إضافة ${coin.symbol} للمفضلات (المجموع: ${currentFavorites.length})`);
     return true;
   } catch (error) {
     console.error(`❌ خطأ في إضافة ${coin.symbol}:`, error.message);
@@ -243,9 +282,16 @@ async function runAutoSearch() {
     console.log(`  Groq: ${groqResult?.recommendation || 'N/A'} (${groqResult?.confidence || 0}%)`);
     console.log(`  Gemini: ${geminiResult?.recommendation || 'N/A'} (${geminiResult?.confidence || 0}%)`);
     
-    // إذا اتفقا على الشراء
-    if (groqBuy && geminiBuy) {
-      console.log(`  ✨ اتفقا على الشراء!`);
+    // إذا لم توجد مفاتيح AI، أضف العملة مباشرة للمفضلات
+    const noAiKeys = !GROQ_API_KEY || !GEMINI_API_KEY;
+    
+    // إذا اتفقا على الشراء أو لا توجد مفاتيح AI
+    if ((groqBuy && geminiBuy) || noAiKeys) {
+      if (noAiKeys) {
+        console.log(`  📌 إضافة مباشرة (بدون تحليل AI)`);
+      } else {
+        console.log(`  ✨ اتفقا على الشراء!`);
+      }
       const success = await addToFavorites(coin);
       if (success) addedCount++;
     } else {

@@ -179,59 +179,65 @@ export function useFavorites() {
     return new Set();
   };
 
-  // تحميل المفضلات من localStorage مع إزالة عملات المحفظة
+  // تحميل المفضلات من localStorage + البحث التلقائي مع إزالة عملات المحفظة
   useEffect(() => {
     const loadFavorites = async () => {
       // جلب عملات المحفظة
       const portfolio = await fetchPortfolioSymbols();
       setPortfolioSymbols(portfolio);
 
+      // 1. جلب المفضلات من localStorage
       const saved = localStorage.getItem(FAVORITES_KEY);
+      let localFavorites: SearchCoin[] = [];
       
-      // إذا لم توجد مفضلات محفوظة، استخدم الافتراضية
-      if (!saved || saved === '[]') {
-        console.log('📋 استعادة المفضلات الافتراضية...');
-        // فلترة الافتراضية أيضاً من عملات المحفظة
-        const filteredDefaults = defaultFavorites.filter(coin => {
-          const symbolWithoutUSDT = coin.symbol.replace('USDT', '').toUpperCase();
-          return !portfolio.has(symbolWithoutUSDT) && !portfolio.has(coin.symbol.toUpperCase());
-        });
-        setFavorites(filteredDefaults);
-        setFavoriteSymbols(new Set(filteredDefaults.map(coin => coin.symbol)));
-        localStorage.setItem(FAVORITES_KEY, JSON.stringify(filteredDefaults));
-        return;
-      }
-      if (saved) {
+      if (saved && saved !== '[]') {
         try {
-          const parsed: SearchCoin[] = JSON.parse(saved);
-          
-          // فلترة المفضلات: إزالة العملات الموجودة في المحفظة
-          const cleanedFavorites = parsed.filter(coin => {
-            const symbolWithoutUSDT = coin.symbol.replace('USDT', '').toUpperCase();
-            const isInPortfolio = portfolio.has(symbolWithoutUSDT) || portfolio.has(coin.symbol.toUpperCase());
-            
-            if (isInPortfolio) {
-              console.log(`🗑️ إزالة ${coin.symbol} من المفضلات - موجودة في المحفظة`);
-            }
-            return !isInPortfolio;
-          });
-
-          // إذا تمت إزالة عملات، حفظ القائمة المحدثة
-          if (cleanedFavorites.length !== parsed.length) {
-            localStorage.setItem(FAVORITES_KEY, JSON.stringify(cleanedFavorites));
-            console.log(`✅ تم تنظيف المفضلات: ${parsed.length - cleanedFavorites.length} عملة محذوفة`);
-          }
-
-          setFavorites(cleanedFavorites);
-          setFavoriteSymbols(new Set(cleanedFavorites.map((coin: SearchCoin) => coin.symbol)));
-          console.log(`📋 تم تحميل ${cleanedFavorites.length} عملة من المفضلات`);
-        } catch (error) {
-          console.error('Error loading favorites:', error);
+          localFavorites = JSON.parse(saved);
+        } catch (e) {
+          localFavorites = [];
         }
       }
+
+      // 2. جلب المفضلات من البحث التلقائي (auto-favorites.json)
+      let autoFavorites: SearchCoin[] = [];
+      try {
+        const response = await fetch('/auto-favorites.json');
+        if (response.ok) {
+          autoFavorites = await response.json();
+          console.log(`🤖 تم تحميل ${autoFavorites.length} عملة من البحث التلقائي`);
+        }
+      } catch (e) {
+        // لا يوجد ملف - هذا طبيعي
+      }
+
+      // 3. دمج القوائم (مع تجنب التكرار)
+      const existingSymbols = new Set(localFavorites.map(c => c.symbol));
+      const newAutoFavorites = autoFavorites.filter(c => !existingSymbols.has(c.symbol));
+      let allFavorites = [...localFavorites, ...newAutoFavorites];
+      
+      // إذا كانت القائمة فارغة، استخدم الافتراضية
+      if (allFavorites.length === 0) {
+        console.log('📋 استعادة المفضلات الافتراضية...');
+        allFavorites = defaultFavorites;
+      }
+      
+      // فلترة: إزالة العملات الموجودة في المحفظة
+      const cleanedFavorites = allFavorites.filter(coin => {
+        const symbolWithoutUSDT = coin.symbol.replace('USDT', '').toUpperCase();
+        return !portfolio.has(symbolWithoutUSDT) && !portfolio.has(coin.symbol.toUpperCase());
+      });
+
+      setFavorites(cleanedFavorites);
+      setFavoriteSymbols(new Set(cleanedFavorites.map(coin => coin.symbol)));
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(cleanedFavorites));
+      console.log(`📋 المجموع: ${cleanedFavorites.length} عملة في المفضلات`);
     };
 
     loadFavorites();
+    
+    // إعادة التحميل كل 30 ثانية للحصول على عملات البحث التلقائي الجديدة
+    const interval = setInterval(loadFavorites, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // إضافة إلى المفضلات
