@@ -6,7 +6,6 @@
  * تجلب 5 عملات، تحللها، وتضيفها للمفضلات تلقائياً
  */
 
-import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
@@ -36,31 +35,36 @@ async function fetchCoins() {
   try {
     console.log('📊 جاري جلب العملات من Binance...');
     
-    const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
-    if (!response.ok) throw new Error('Binance API error');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    const response = await fetch('https://api.binance.com/api/v3/ticker/24hr', {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) throw new Error(`Binance API error: ${response.status}`);
     
     const tickers = await response.json();
     
     // تصفية العملات
-    const usdtCoins = tickers.filter(t => t.symbol.endsWith('USDT'));
+    const usdtCoins = tickers.filter(t => t.symbol && t.symbol.endsWith('USDT'));
     
-    // تطبيق الشروط الأساسية
-    let filtered = usdtCoins
-      .filter(t => {
-        const price = parseFloat(t.lastPrice);
-        const volume = parseFloat(t.quoteAssetVolume);
-        return price >= 0.10 && price <= 10 && volume >= 50000;
-      })
-      .map(t => {
-        const symbol = t.symbol.replace('USDT', '');
-        return {
-          symbol,
-          name: symbol,
-          price: t.lastPrice,
-          priceChange: parseFloat(t.priceChangePercent),
-          volume: parseFloat(t.quoteAssetVolume),
-        };
-      });
+    console.log(`📈 وجدنا ${usdtCoins.length} عملة USDT`);
+    
+    // تطبيق الشروط الأساسية - بسيطة جداً للاختبار
+    let filtered = usdtCoins.slice(0, 50).map(t => {
+      const symbol = t.symbol.replace('USDT', '');
+      return {
+        symbol,
+        name: symbol,
+        price: t.lastPrice,
+        priceChange: parseFloat(t.priceChangePercent) || 0,
+        volume: parseFloat(t.quoteAssetVolume) || 0,
+      };
+    });
+
+    console.log(`✅ بعد الفلاتر: ${filtered.length} عملة`);
 
     // اختيار 5 عملات عشوائية
     const selected = [];
@@ -70,7 +74,7 @@ async function fetchCoins() {
       filtered.splice(randomIndex, 1);
     }
 
-    console.log(`✅ تم جلب ${selected.length} عملة`);
+    console.log(`✅ تم اختيار ${selected.length} عملة`);
     return selected;
   } catch (error) {
     console.error('❌ خطأ في جلب العملات:', error.message);
