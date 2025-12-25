@@ -101,9 +101,30 @@ SUMMARY: [ملخص قصير جداً 10-15 كلمة]
     console.log('✅ API Response received for:', coinData.symbol);
     
     const analysis = data.choices[0].message.content;
+    console.log('📝 AI Raw Response:', analysis);
 
-    // Parse the response
-    const recommended = analysis.includes('RECOMMENDED: YES');
+    // Parse the response - check multiple patterns for YES
+    const recommendedPatterns = [
+      'RECOMMENDED: YES',
+      'RECOMMENDED:YES',
+      'YES',
+      'ينصح',
+      'نعم',
+      'موصى',
+      'شراء',
+      'BUY',
+      'اشتري',
+      'فرصة'
+    ];
+    
+    // Check if any positive pattern exists (case insensitive)
+    const analysisUpper = analysis.toUpperCase();
+    const recommended = recommendedPatterns.some(pattern => 
+      analysisUpper.includes(pattern.toUpperCase())
+    ) && !analysisUpper.includes('RECOMMENDED: NO') && !analysisUpper.includes('لا ينصح');
+    
+    console.log(`🎯 ${coinData.symbol} - Recommended: ${recommended}`);
+    
     const confidenceMatch = analysis.match(/CONFIDENCE: (HIGH|MEDIUM|LOW)/i);
     const reasonMatch = analysis.match(/REASON: (.+)/);
     const summaryMatch = analysis.match(/SUMMARY: (.+)/);

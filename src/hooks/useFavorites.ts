@@ -198,28 +198,14 @@ export function useFavorites() {
         }
       }
 
-      // 2. جلب المفضلات من البحث التلقائي (auto-favorites.json)
-      let autoFavorites: SearchCoin[] = [];
-      try {
-        const response = await fetch('/auto-favorites.json');
-        if (response.ok) {
-          autoFavorites = await response.json();
-          console.log(`🤖 تم تحميل ${autoFavorites.length} عملة من البحث التلقائي`);
-        }
-      } catch (e) {
-        // لا يوجد ملف - هذا طبيعي
-      }
-
-      // 3. دمج القوائم (مع تجنب التكرار)
-      const existingSymbols = new Set(localFavorites.map(c => c.symbol));
-      const newAutoFavorites = autoFavorites.filter(c => !existingSymbols.has(c.symbol));
-      let allFavorites = [...localFavorites, ...newAutoFavorites];
+      // المفضلات فقط من localStorage - لا نحمّل أي شيء تلقائي
+      let allFavorites = localFavorites;
       
-      // إذا كانت القائمة فارغة، استخدم الافتراضية
-      if (allFavorites.length === 0) {
-        console.log('📋 استعادة المفضلات الافتراضية...');
-        allFavorites = defaultFavorites;
-      }
+      // لا نستعيد المفضلات الافتراضية - إذا مسح المستخدم كل شيء، تبقى فارغة
+      // if (allFavorites.length === 0) {
+      //   console.log('📋 استعادة المفضلات الافتراضية...');
+      //   allFavorites = defaultFavorites;
+      // }
       
       // فلترة: إزالة العملات الموجودة في المحفظة
       const cleanedFavorites = allFavorites.filter(coin => {
@@ -235,18 +221,36 @@ export function useFavorites() {
 
     loadFavorites();
     
-    // إعادة التحميل كل 30 ثانية للحصول على عملات البحث التلقائي الجديدة
-    const interval = setInterval(loadFavorites, 30000);
-    return () => clearInterval(interval);
+    // لا نحتاج إعادة التحميل التلقائي
+    // const interval = setInterval(loadFavorites, 30000);
+    // return () => clearInterval(interval);
   }, []);
 
-  // إضافة إلى المفضلات
+  // إضافة إلى المفضلات - قراءة من localStorage مباشرة لتجنب مشاكل الـ state
   const addFavorite = (coin: SearchCoin) => {
-    if (!favoriteSymbols.has(coin.symbol)) {
-      const updated = [...favorites, coin];
-      setFavorites(updated);
-      setFavoriteSymbols(new Set([...favoriteSymbols, coin.symbol]));
+    // قراءة المفضلات الحالية من localStorage مباشرة
+    const saved = localStorage.getItem(FAVORITES_KEY);
+    let currentFavorites: SearchCoin[] = [];
+    
+    try {
+      if (saved) {
+        currentFavorites = JSON.parse(saved);
+      }
+    } catch (e) {
+      currentFavorites = [];
+    }
+    
+    // التحقق من عدم وجود العملة مسبقاً
+    const alreadyExists = currentFavorites.some(f => f.symbol === coin.symbol);
+    
+    if (!alreadyExists) {
+      console.log(`💾 إضافة ${coin.symbol} للمفضلات (localStorage)`);
+      const updated = [...currentFavorites, coin];
       localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+      setFavorites(updated);
+      setFavoriteSymbols(new Set(updated.map(c => c.symbol)));
+    } else {
+      console.log(`⏭️ ${coin.symbol} موجودة مسبقاً في localStorage`);
     }
   };
 

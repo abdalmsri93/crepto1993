@@ -109,8 +109,9 @@ const SuggestCoins = () => {
   const [maxPrice, setMaxPrice] = useState<string>("10");
   const [coinCount, setCoinCount] = useState<string>("5");
   const [session, setSession] = useState<any>(null);
-  const { toggleFavorite, isFavorite } = useFavorites();
+  const { toggleFavorite, isFavorite, addFavorite, favoriteSymbols } = useFavorites();
   const [aiConfigured, setAiConfigured] = useState(false);
+  const [autoAddedCount, setAutoAddedCount] = useState(0);
   
   // الفلاتر المتقدمة (مخفية في Accordion)
   const [advancedFilters, setAdvancedFilters] = useState({
@@ -382,9 +383,21 @@ const SuggestCoins = () => {
         
         console.log(`✅ بعد جميع الفلاتر: ${coins.length} عملة`);
         
-        // إزالة العملات الموجودة
+        // إزالة العملات الموجودة في المحفظة
         const currentSymbols = new Set(currentAssets.map(a => a.toUpperCase()));
         coins = coins.filter(coin => !currentSymbols.has(coin.symbol.toUpperCase()));
+        console.log(`بعد إزالة عملات المحفظة: ${coins.length}`);
+        
+        // 🆕 إزالة العملات الموجودة في المفضلات
+        coins = coins.filter(coin => {
+          const symbolWithUSDT = coin.symbol + 'USDT';
+          const isInFavorites = favoriteSymbols.has(coin.symbol) || favoriteSymbols.has(symbolWithUSDT);
+          if (isInFavorites) {
+            console.log(`⭐ تجاهل ${coin.symbol} - موجودة في المفضلات`);
+          }
+          return !isInFavorites;
+        });
+        console.log(`بعد إزالة عملات المفضلات: ${coins.length}`);
         
         // تنويع عشوائي
         coins = coins.sort(() => Math.random() - 0.5);
@@ -437,12 +450,19 @@ const SuggestCoins = () => {
   // Analyze coins with AI
   const analyzeCoinsWithAI = async (coinsToAnalyze: CoinSuggestion[]) => {
     setIsAnalyzing(true);
+    setAutoAddedCount(0);
     toast({
       title: "🤖 جاري تحليل العملات بالذكاء الاصطناعي",
       description: "هذا قد يستغرق بضع ثوان...",
     });
 
     const updatedCoins: CoinSuggestion[] = [];
+    let addedToFavoritesCount = 0;
+    
+    // 🔧 تتبع العملات المُضافة خلال هذا التحليل لتجنب التكرار
+    const addedDuringAnalysis = new Set<string>();
+    // جمع كل العملات الموصى بها أولاً ثم إضافتها دفعة واحدة
+    const coinsToAddToFavorites: any[] = [];
 
     for (const coin of coinsToAnalyze) {
       const analysis = await getDualAIAnalysis({
@@ -457,10 +477,75 @@ const SuggestCoins = () => {
         recommendation: coin.recommendation,
       });
 
-      updatedCoins.push({
+      const updatedCoin = {
         ...coin,
         aiAnalysis: analysis,
-      });
+      };
+      
+      updatedCoins.push(updatedCoin);
+
+      // 🆕 إضافة تلقائية للمفضلات فقط إذا الاثنين (ChatGPT + Gemini) يوصيان
+      const chatGptRecommends = analysis.chatgpt?.recommended === true;
+      const geminiRecommends = analysis.gemini?.recommended === true;
+      
+      // إضافة فقط إذا الاثنين يوصيان
+      const bothRecommend = chatGptRecommends && geminiRecommends;
+      
+      console.log(`🔍 ${coin.symbol}: ChatGPT=${chatGptRecommends}, Gemini=${geminiRecommends}, Both=${bothRecommend}`);
+      
+      const symbolWithUSDT = coin.symbol + 'USDT';
+      
+      // التحقق من localStorage مباشرة بدلاً من state
+      const savedFavorites = localStorage.getItem('binance_watch_favorites');
+      let existingSymbols: string[] = [];
+      try {
+        if (savedFavorites) {
+          existingSymbols = JSON.parse(savedFavorites).map((f: any) => f.symbol);
+        }
+      } catch (e) {}
+      
+      const alreadyInLocalStorage = existingSymbols.includes(coin.symbol) || existingSymbols.includes(symbolWithUSDT);
+      const alreadyAddedThisSession = addedDuringAnalysis.has(symbolWithUSDT);
+      const alreadyFavorite = alreadyInLocalStorage || alreadyAddedThisSession;
+      
+      console.log(`📊 ${coin.symbol}: في localStorage=${alreadyInLocalStorage}, أُضيفت هذه الجلسة=${alreadyAddedThisSession}`);
+      
+      if (bothRecommend) {
+        if (!alreadyFavorite) {
+          console.log(`⭐ سيتم إضافة: ${coin.symbol} - ChatGPT ✅ + Gemini ✅`);
+          
+          // تخزين العملة للإضافة لاحقاً
+          coinsToAddToFavorites.push({
+            symbol: symbolWithUSDT,
+            name: coin.name,
+            price: parseFloat(coin.price.replace('$', '')),
+            priceChange24h: parseFloat(coin.growth.replace('%', '').replace('+', '')),
+            volume24h: 0,
+            marketCap: 0,
+            rank: 0,
+            growth: coin.growth,
+            liquidity: coin.liquidity,
+            riskLevel: coin.riskLevel,
+            valueScore: coin.valueScore || '',
+            isHalal: true,
+            category: '🤖 AI مُوصى بها',
+          });
+          
+          // تسجيل أنها ستُضاف
+          addedDuringAnalysis.add(symbolWithUSDT);
+          addedToFavoritesCount++;
+          setAutoAddedCount(prev => prev + 1);
+          
+          toast({
+            title: `⭐ ${coin.symbol} سيتم إضافتها للمفضلات`,
+            description: "ChatGPT ✅ + Gemini ✅",
+          });
+        } else {
+          console.log(`⏭️ ${coin.symbol} - موجودة مسبقاً في المفضلات`);
+        }
+      } else {
+        console.log(`❌ ${coin.symbol} - لم يتفق الاثنين: ChatGPT=${chatGptRecommends ? '✅' : '❌'}, Gemini=${geminiRecommends ? '✅' : '❌'}`);
+      }
 
       // Update coins in real-time
       setCoins([...updatedCoins]);
@@ -469,11 +554,29 @@ const SuggestCoins = () => {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
+    // 🔧 إضافة جميع العملات الموصى بها دفعة واحدة بعد انتهاء التحليل
+    console.log(`📋 إضافة ${coinsToAddToFavorites.length} عملة للمفضلات...`);
+    for (const coinToAdd of coinsToAddToFavorites) {
+      console.log(`➕ إضافة ${coinToAdd.symbol} للمفضلات`);
+      addFavorite(coinToAdd);
+      // تأخير صغير بين كل إضافة للسماح للـ state بالتحديث
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    console.log(`✅ تم إضافة ${coinsToAddToFavorites.length} عملة للمفضلات`);
+
     setIsAnalyzing(false);
-    toast({
-      title: "✅ اكتمل التحليل الذكي",
-      description: `تم تحليل ${updatedCoins.length} عملة بواسطة AI`,
-    });
+    
+    if (addedToFavoritesCount > 0) {
+      toast({
+        title: "✅ اكتمل التحليل الذكي",
+        description: `تم تحليل ${updatedCoins.length} عملة وإضافة ${addedToFavoritesCount} للمفضلات تلقائياً ⭐`,
+      });
+    } else {
+      toast({
+        title: "✅ اكتمل التحليل الذكي",
+        description: `تم تحليل ${updatedCoins.length} عملة - لم يتفق AI على أي عملة`,
+      });
+    }
   };
 
   // Check if AI is configured on mount
@@ -823,9 +926,9 @@ const SuggestCoins = () => {
 
         {coins.length > 0 && !isLoading && (
           <div className="space-y-4">
-            <div className="flex gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {coins.map((coin, i) => (
-                <Card key={i} className="flex-1 relative">
+                <Card key={i} className="relative">
                   {coin.aiAnalysis?.isLoading && (
                     <div className="absolute top-2 left-2 z-10">
                       <Loader2 className="w-4 h-4 animate-spin text-primary" />
