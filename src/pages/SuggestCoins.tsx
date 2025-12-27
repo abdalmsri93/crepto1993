@@ -80,17 +80,31 @@ async function fetchCoinGenesisDate(symbol: string): Promise<string | null> {
   try {
     console.log(`📅 جلب تاريخ ${symbol}...`);
     
-    // البحث عن العملة في CoinGecko
-    const searchResponse = await fetch(
-      `https://api.coingecko.com/api/v3/search?query=${symbol.toLowerCase()}`
-    );
+    // استخدام CoinGecko API مباشرة (بدون proxy)
+    const searchUrl = `https://api.coingecko.com/api/v3/search?query=${symbol.toLowerCase()}`;
+    
+    console.log(`🔍 البحث: ${searchUrl}`);
+    
+    const searchResponse = await fetch(searchUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
     
     if (!searchResponse.ok) {
-      console.log(`❌ فشل البحث عن ${symbol}: ${searchResponse.status}`);
+      console.log(`❌ فشل البحث عن ${symbol}: ${searchResponse.status} - ${searchResponse.statusText}`);
+      // إذا كان rate limit، انتظر ثم حاول مرة أخرى
+      if (searchResponse.status === 429) {
+        console.log(`⏳ Rate limit، انتظار 60 ثانية...`);
+        await new Promise(resolve => setTimeout(resolve, 60000));
+        return fetchCoinGenesisDate(symbol); // إعادة المحاولة
+      }
       return null;
     }
     
     const searchData = await searchResponse.json();
+    console.log(`📊 نتائج البحث:`, searchData.coins?.length || 0, 'عملات');
     
     // البحث عن أفضل تطابق
     const coin = searchData.coins?.find((c: any) => 
@@ -102,39 +116,63 @@ async function fetchCoinGenesisDate(symbol: string): Promise<string | null> {
       return null;
     }
     
-    console.log(`✅ وُجدت العملة: ${coin.id}`);
+    console.log(`✅ وُجدت العملة: ${coin.id} (${coin.name})`);
     
     // تأخير قبل الطلب الثاني
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // جلب تفاصيل العملة للحصول على genesis_date
-    const detailsResponse = await fetch(
-      `https://api.coingecko.com/api/v3/coins/${coin.id}?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false`
-    );
+    // جلب تفاصيل العملة مع market_data للحصول على التاريخ
+    const detailsUrl = `https://api.coingecko.com/api/v3/coins/${coin.id}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false`;
+    
+    console.log(`📥 جلب التفاصيل: ${coin.id}`);
+    
+    const detailsResponse = await fetch(detailsUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
     
     if (!detailsResponse.ok) {
       console.log(`❌ فشل جلب تفاصيل ${coin.id}: ${detailsResponse.status}`);
+      if (detailsResponse.status === 429) {
+        console.log(`⏳ Rate limit على التفاصيل، تخطي...`);
+      }
       return null;
     }
     
     const details = await detailsResponse.json();
+    console.log(`📊 التفاصيل:`, { genesis_date: details.genesis_date, has_ath: !!details.market_data?.ath_date });
     
+    // محاولة الحصول على التاريخ من مصادر متعددة
+    let dateStr: string | null = null;
+    
+    // 1. genesis_date (تاريخ الإطلاق الأصلي)
     if (details.genesis_date) {
-      // تحويل التاريخ لصيغة قابلة للقراءة
-      const date = new Date(details.genesis_date);
+      dateStr = details.genesis_date;
+      console.log(`📅 genesis_date: ${dateStr}`);
+    }
+    // 2. ath_date.usd (تاريخ أعلى سعر - يعكس بداية التداول تقريباً)
+    else if (details.market_data?.ath_date?.usd) {
+      dateStr = details.market_data.ath_date.usd;
+      console.log(`📅 ath_date: ${dateStr}`);
+    }
+    
+    if (dateStr) {
+      const date = new Date(dateStr);
       const formattedDate = date.toLocaleDateString('ar-EG', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
       });
-      console.log(`📅 تاريخ ${symbol}: ${formattedDate}`);
+      console.log(`✅ تاريخ ${symbol}: ${formattedDate}`);
       return formattedDate;
     }
     
-    console.log(`⚠️ لا يوجد genesis_date لـ ${symbol}`);
+    console.log(`⚠️ لا يوجد تاريخ لـ ${symbol}`);
     return null;
   } catch (error) {
-    console.log(`⚠️ خطأ في جلب تاريخ ${symbol}:`, error);
+    console.error(`❌ خطأ في جلب تاريخ ${symbol}:`, error);
     return null;
   }
 }
@@ -144,17 +182,22 @@ async function fetchAllGenesisDates(
   coins: CoinSuggestion[],
   onUpdate: (updatedCoins: CoinSuggestion[]) => void
 ) {
+  console.log(`📅 ========================================`);
   console.log(`📅 بدء جلب التواريخ لـ ${coins.length} عملات...`);
+  console.log(`📅 ========================================`);
+  
   const updatedCoins = [...coins];
   
   for (let i = 0; i < updatedCoins.length; i++) {
     const coin = updatedCoins[i];
     
-    // تأخير 1.5 ثانية بين كل طلب لتجنب rate limit
+    // تأخير 2 ثانية بين كل طلب لتجنب rate limit
     if (i > 0) {
-      console.log(`⏳ انتظار 1.5 ثانية قبل العملة التالية...`);
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      console.log(`⏳ انتظار 2 ثانية قبل العملة التالية (${i+1}/${updatedCoins.length})...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
+    
+    console.log(`\n🔄 معالجة ${coin.symbol} (${i+1}/${updatedCoins.length})...`);
     
     const genesisDate = await fetchCoinGenesisDate(coin.symbol);
     
@@ -169,7 +212,9 @@ async function fetchAllGenesisDates(
     onUpdate([...updatedCoins]);
   }
   
+  console.log(`\n📅 ========================================`);
   console.log(`✅ اكتمل جلب جميع التواريخ!`);
+  console.log(`📅 ========================================`);
 }
 
 interface CoinSuggestion {
