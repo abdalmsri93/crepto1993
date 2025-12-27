@@ -75,6 +75,103 @@ function calculateInvestmentDistribution(coins: any[], totalAmount: number) {
   });
 }
 
+// 📅 دالة لجلب تاريخ إصدار العملة من CoinGecko
+async function fetchCoinGenesisDate(symbol: string): Promise<string | null> {
+  try {
+    console.log(`📅 جلب تاريخ ${symbol}...`);
+    
+    // البحث عن العملة في CoinGecko
+    const searchResponse = await fetch(
+      `https://api.coingecko.com/api/v3/search?query=${symbol.toLowerCase()}`
+    );
+    
+    if (!searchResponse.ok) {
+      console.log(`❌ فشل البحث عن ${symbol}: ${searchResponse.status}`);
+      return null;
+    }
+    
+    const searchData = await searchResponse.json();
+    
+    // البحث عن أفضل تطابق
+    const coin = searchData.coins?.find((c: any) => 
+      c.symbol?.toLowerCase() === symbol.toLowerCase()
+    ) || searchData.coins?.[0];
+    
+    if (!coin?.id) {
+      console.log(`❌ لم يُعثر على ${symbol} في CoinGecko`);
+      return null;
+    }
+    
+    console.log(`✅ وُجدت العملة: ${coin.id}`);
+    
+    // تأخير قبل الطلب الثاني
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // جلب تفاصيل العملة للحصول على genesis_date
+    const detailsResponse = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${coin.id}?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false`
+    );
+    
+    if (!detailsResponse.ok) {
+      console.log(`❌ فشل جلب تفاصيل ${coin.id}: ${detailsResponse.status}`);
+      return null;
+    }
+    
+    const details = await detailsResponse.json();
+    
+    if (details.genesis_date) {
+      // تحويل التاريخ لصيغة قابلة للقراءة
+      const date = new Date(details.genesis_date);
+      const formattedDate = date.toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      console.log(`📅 تاريخ ${symbol}: ${formattedDate}`);
+      return formattedDate;
+    }
+    
+    console.log(`⚠️ لا يوجد genesis_date لـ ${symbol}`);
+    return null;
+  } catch (error) {
+    console.log(`⚠️ خطأ في جلب تاريخ ${symbol}:`, error);
+    return null;
+  }
+}
+
+// 📅 جلب تواريخ الإصدار لمجموعة عملات (مع تأخير لتجنب rate limit)
+async function fetchAllGenesisDates(
+  coins: CoinSuggestion[],
+  onUpdate: (updatedCoins: CoinSuggestion[]) => void
+) {
+  console.log(`📅 بدء جلب التواريخ لـ ${coins.length} عملات...`);
+  const updatedCoins = [...coins];
+  
+  for (let i = 0; i < updatedCoins.length; i++) {
+    const coin = updatedCoins[i];
+    
+    // تأخير 1.5 ثانية بين كل طلب لتجنب rate limit
+    if (i > 0) {
+      console.log(`⏳ انتظار 1.5 ثانية قبل العملة التالية...`);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    
+    const genesisDate = await fetchCoinGenesisDate(coin.symbol);
+    
+    updatedCoins[i] = {
+      ...coin,
+      genesisDate: genesisDate || 'غير متوفر',
+      isLoadingDate: false
+    };
+    
+    // تحديث الواجهة بعد كل عملة
+    console.log(`✅ تم تحديث ${coin.symbol}: ${updatedCoins[i].genesisDate}`);
+    onUpdate([...updatedCoins]);
+  }
+  
+  console.log(`✅ اكتمل جلب جميع التواريخ!`);
+}
+
 interface CoinSuggestion {
   name: string;
   symbol: string;
@@ -96,6 +193,8 @@ interface CoinSuggestion {
     website?: string;
   };
   aiAnalysis?: DualAnalysis;
+  genesisDate?: string; // 📅 تاريخ إصدار العملة من CoinGecko
+  isLoadingDate?: boolean; // 🔄 حالة تحميل التاريخ
 }
 
 const SuggestCoins = () => {
@@ -410,12 +509,20 @@ const SuggestCoins = () => {
           selectedCoins = calculateInvestmentDistribution(selectedCoins, totalAmount);
         }
         
-        setCoins(selectedCoins as CoinSuggestion[]);
+        // تعيين العملات مع حالة تحميل التاريخ
+        const coinsWithLoadingDate = selectedCoins.map(coin => ({
+          ...coin,
+          isLoadingDate: true,
+          genesisDate: '⏳ جاري التحميل...'
+        }));
+        
+        setCoins(coinsWithLoadingDate as CoinSuggestion[]);
         setNotes([
           `✅ تم اختيار ${selectedCoins.length} عملة جديدة من Binance`,
           `📊 النطاق السعري: $${min} - $${max}`,
           totalAmount > 0 ? `💵 المبلغ المقترح: $${totalAmount.toFixed(2)} موزع حسب قوة العملات` : "💡 التوصيات بناءً على الأداء والسيولة",
           "🔄 جميع العملات من Binance مباشرة",
+          "📅 جاري جلب تواريخ الإصدار من CoinGecko...",
           "💡 كل بحث = نتائج مختلفة",
           "⚠️ بحث واستثمر بحكمة!"
         ]);
@@ -427,9 +534,14 @@ const SuggestCoins = () => {
             : `تم الحصول على ${selectedCoins.length} عملات جديدة من Binance`,
         });
 
+        // 📅 جلب تواريخ الإصدار من CoinGecko في الخلفية
+        fetchAllGenesisDates(coinsWithLoadingDate as CoinSuggestion[], (updatedCoins) => {
+          setCoins(updatedCoins);
+        });
+
         // Start AI analysis automatically if configured
         if (isAIConfigured()) {
-          analyzeCoinsWithAI(selectedCoins as CoinSuggestion[]);
+          analyzeCoinsWithAI(coinsWithLoadingDate as CoinSuggestion[]);
         }
       } catch (fetchError) {
         console.error("Error:", fetchError);
@@ -941,6 +1053,22 @@ const SuggestCoins = () => {
                       <div className={`text-sm ${coin.growth.includes('+') ? 'text-green-600' : 'text-red-600'}`}>
                         {coin.growth}
                       </div>
+                      
+                      {/* 📅 تاريخ إصدار العملة */}
+                      <div className={`text-xs mt-2 flex items-center justify-end gap-1 ${coin.isLoadingDate ? 'text-muted-foreground' : 'text-blue-500'}`}>
+                        {coin.isLoadingDate ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>جاري جلب التاريخ...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>📅</span>
+                            <span>{coin.genesisDate || 'غير متوفر'}</span>
+                          </>
+                        )}
+                      </div>
+                      
                       <div className="text-xs mt-2">{coin.riskLevel}</div>
                       <div className="text-xs">{coin.recommendation}</div>
                       
