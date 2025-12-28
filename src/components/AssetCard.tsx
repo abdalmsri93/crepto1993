@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, ExternalLink, Calendar, Tag, Loader2, Plus, DollarSign } from "lucide-react";
+import { TrendingUp, ExternalLink, Calendar, Tag, Loader2, Plus, DollarSign, Wallet } from "lucide-react";
 import { useCoinMetadata } from "@/hooks/useCoinMetadata";
 
 interface AssetCardProps {
@@ -49,11 +49,21 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const [boostAmount, setBoostAmount] = useState<string>("");
   const [totalBoost, setTotalBoost] = useState<number>(0);
   
+  // 💵 حالة مبلغ الاستثمار الأصلي
+  const [investmentAmount, setInvestmentAmount] = useState<string>("");
+  const [savedInvestment, setSavedInvestment] = useState<number>(0);
+  
   // تحميل مبلغ التعزيز المحفوظ عند التحميل
   useEffect(() => {
     const savedBoost = localStorage.getItem(`boost_${asset}`);
     if (savedBoost) {
       setTotalBoost(parseFloat(savedBoost));
+    }
+    
+    // تحميل مبلغ الاستثمار المحفوظ
+    const savedInv = localStorage.getItem(`investment_${asset}`);
+    if (savedInv) {
+      setSavedInvestment(parseFloat(savedInv));
     }
   }, [asset]);
   
@@ -74,6 +84,24 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     e.stopPropagation();
     setTotalBoost(0);
     localStorage.removeItem(`boost_${asset}`);
+  };
+  
+  // 💵 حفظ مبلغ الاستثمار الأصلي
+  const handleSaveInvestment = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const amount = parseFloat(investmentAmount);
+    if (amount > 0) {
+      setSavedInvestment(amount);
+      localStorage.setItem(`investment_${asset}`, amount.toString());
+      setInvestmentAmount("");
+    }
+  };
+  
+  // إعادة تعيين مبلغ الاستثمار
+  const handleResetInvestment = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSavedInvestment(0);
+    localStorage.removeItem(`investment_${asset}`);
   };
   
   const handleAssetClick = () => {
@@ -176,7 +204,51 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
             </span>
           </div>
           
-          {/* 💰 قسم مبلغ التعزيز */}
+          {/* � قسم مبلغ الاستثمار الأصلي */}
+          <div className="mt-3 p-3 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-lg border border-blue-500/30">
+            <div className="flex justify-between items-center mb-2">
+              <div className="flex items-center gap-1.5 text-blue-400 text-sm font-semibold">
+                <Wallet className="w-4 h-4" />
+                مبلغ الاستثمار
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-orbitron text-blue-400 font-bold text-lg">
+                  ${savedInvestment.toLocaleString()}
+                </span>
+                {savedInvestment > 0 && (
+                  <button
+                    onClick={handleResetInvestment}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    title="إعادة تعيين"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={investmentAmount}
+                onChange={(e) => setInvestmentAmount(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="أدخل المبلغ..."
+                className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-blue-500/30 focus:border-blue-500 focus:outline-none text-right"
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveInvestment}
+                disabled={!investmentAmount || parseFloat(investmentAmount) <= 0}
+                className="bg-blue-500 hover:bg-blue-600 text-white gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                حفظ
+              </Button>
+            </div>
+          </div>
+          
+          {/* �💰 قسم مبلغ التعزيز */}
           <div className="mt-3 p-3 bg-gradient-to-r from-emerald-500/10 to-green-500/10 rounded-lg border border-emerald-500/30">
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-semibold">
@@ -218,6 +290,22 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                 إضافة
               </Button>
             </div>
+          </div>
+          
+          {/* 💎 قسم المجموع الكلي */}
+          <div className="mt-3 p-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-1.5 text-purple-400 text-sm font-semibold">
+                <DollarSign className="w-4 h-4" />
+                المجموع الكلي
+              </div>
+              <span className="font-orbitron text-purple-400 font-bold text-xl">
+                ${(savedInvestment + totalBoost).toLocaleString()}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground/60 mt-1 text-right">
+              الاستثمار + التعزيزات
+            </p>
           </div>
         </div>
       </CardContent>
