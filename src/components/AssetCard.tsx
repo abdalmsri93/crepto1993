@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, ExternalLink, Calendar, Tag, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, ExternalLink, Calendar, Tag, Loader2, Plus, DollarSign } from "lucide-react";
 import { useCoinMetadata } from "@/hooks/useCoinMetadata";
 
 interface AssetCardProps {
@@ -43,6 +44,37 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   
   // جلب بيانات العملة من الـ APIs
   const { launchDate, category, loading, error } = useCoinMetadata(asset);
+  
+  // 💰 حالة مبلغ التعزيز التراكمي
+  const [boostAmount, setBoostAmount] = useState<string>("");
+  const [totalBoost, setTotalBoost] = useState<number>(0);
+  
+  // تحميل مبلغ التعزيز المحفوظ عند التحميل
+  useEffect(() => {
+    const savedBoost = localStorage.getItem(`boost_${asset}`);
+    if (savedBoost) {
+      setTotalBoost(parseFloat(savedBoost));
+    }
+  }, [asset]);
+  
+  // إضافة مبلغ تعزيز جديد
+  const handleAddBoost = (e: React.MouseEvent) => {
+    e.stopPropagation(); // منع فتح رابط Binance
+    const amount = parseFloat(boostAmount);
+    if (amount > 0) {
+      const newTotal = totalBoost + amount;
+      setTotalBoost(newTotal);
+      localStorage.setItem(`boost_${asset}`, newTotal.toString());
+      setBoostAmount("");
+    }
+  };
+  
+  // إعادة تعيين مبلغ التعزيز
+  const handleResetBoost = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTotalBoost(0);
+    localStorage.removeItem(`boost_${asset}`);
+  };
   
   const handleAssetClick = () => {
     const binanceUrl = getBinanceUrl(asset);
@@ -142,6 +174,50 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
             <span className="font-orbitron text-crypto-gold text-lg font-black transition-all duration-300 group-hover:scale-125 origin-right inline-block">
               ${parseFloat(usdValue).toLocaleString()}
             </span>
+          </div>
+          
+          {/* 💰 قسم مبلغ التعزيز */}
+          <div className="mt-3 p-3 bg-gradient-to-r from-emerald-500/10 to-green-500/10 rounded-lg border border-emerald-500/30">
+            <div className="flex justify-between items-center mb-2">
+              <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-semibold">
+                <DollarSign className="w-4 h-4" />
+                إجمالي التعزيزات
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-orbitron text-emerald-400 font-bold text-lg">
+                  ${totalBoost.toLocaleString()}
+                </span>
+                {totalBoost > 0 && (
+                  <button
+                    onClick={handleResetBoost}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    title="إعادة تعيين"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={boostAmount}
+                onChange={(e) => setBoostAmount(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="أدخل المبلغ..."
+                className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-emerald-500/30 focus:border-emerald-500 focus:outline-none text-right"
+              />
+              <Button
+                size="sm"
+                onClick={handleAddBoost}
+                disabled={!boostAmount || parseFloat(boostAmount) <= 0}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                إضافة
+              </Button>
+            </div>
           </div>
         </div>
       </CardContent>
