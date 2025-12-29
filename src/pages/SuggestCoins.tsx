@@ -12,6 +12,7 @@ import { getDualAIAnalysis, isAIConfigured } from "@/lib/ai-analysis";
 import type { DualAnalysis } from "@/lib/ai-analysis";
 import { CoinLaunchDate } from "@/components/CoinLaunchDate";
 import { CoinProject } from "@/components/CoinProject";
+import { CoinCategory } from "@/components/CoinCategory";
 
 // 🔧 دالة لحساب معايير Binance تلقائياً من البيانات الحية
 function calculateBinanceMetrics(ticker: any, allTickers: any[]) {
@@ -947,6 +948,11 @@ const SuggestCoins = () => {
                       {/* تاريخ إصدار العملة */}
                       <div className="my-2">
                         <CoinLaunchDate symbol={coin.symbol} />
+                      </div>
+                      
+                      {/* فئة العملة */}
+                      <div className="my-2">
+                        <CoinCategory symbol={coin.symbol} />
                       </div>
                       
                       {/* وصف مشروع العملة */}

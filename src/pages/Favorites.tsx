@@ -6,6 +6,7 @@ import { Heart, ArrowRight, Trophy, Star, Trash2 } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CoinLaunchDate } from "@/components/CoinLaunchDate";
 import { CoinProject } from "@/components/CoinProject";
+import { CoinCategory } from "@/components/CoinCategory";
 
 const Favorites = () => {
   const navigate = useNavigate();
@@ -128,6 +129,9 @@ const Favorites = () => {
 
                       {/* تاريخ إصدار العملة */}
                       <CoinLaunchDate symbol={coin.symbol} />
+
+                      {/* فئة العملة */}
+                      <CoinCategory symbol={coin.symbol} />
 
                       {/* وصف مشروع العملة */}
                       <CoinProject symbol={coin.symbol} />
