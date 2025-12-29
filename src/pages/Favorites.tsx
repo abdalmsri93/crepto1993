@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Heart, ArrowRight, Trophy, Star, Trash2 } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CoinLaunchDate } from "@/components/CoinLaunchDate";
+import { CoinProject } from "@/components/CoinProject";
 
 const Favorites = () => {
   const navigate = useNavigate();
@@ -127,6 +128,9 @@ const Favorites = () => {
 
                       {/* تاريخ إصدار العملة */}
                       <CoinLaunchDate symbol={coin.symbol} />
+
+                      {/* وصف مشروع العملة */}
+                      <CoinProject symbol={coin.symbol} />
 
                       {/* تاريخ الإضافة */}
                       {coin.addedAt && (

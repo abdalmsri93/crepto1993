@@ -11,6 +11,7 @@ import { NavLink } from "@/components/NavLink";
 import { getDualAIAnalysis, isAIConfigured } from "@/lib/ai-analysis";
 import type { DualAnalysis } from "@/lib/ai-analysis";
 import { CoinLaunchDate } from "@/components/CoinLaunchDate";
+import { CoinProject } from "@/components/CoinProject";
 
 // 🔧 دالة لحساب معايير Binance تلقائياً من البيانات الحية
 function calculateBinanceMetrics(ticker: any, allTickers: any[]) {
@@ -946,6 +947,11 @@ const SuggestCoins = () => {
                       {/* تاريخ إصدار العملة */}
                       <div className="my-2">
                         <CoinLaunchDate symbol={coin.symbol} />
+                      </div>
+                      
+                      {/* وصف مشروع العملة */}
+                      <div className="my-2">
+                        <CoinProject symbol={coin.symbol} />
                       </div>
                       
                       <div className="text-xs mt-2">{coin.riskLevel}</div>
