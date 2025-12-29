@@ -1,6 +1,19 @@
 {
-  "currentVersion": "3.4",
+  "currentVersion": "3.5",
   "versions": [
+    {
+      "version": "3.5",
+      "date": "2025-12-29",
+      "description": "إصلاح رابط Binance في صفحة المفضلة",
+      "features": [
+        "إصلاح خطأ 404 عند الضغط على زر Binance",
+        "إزالة USDT من نهاية رمز العملة تلقائياً",
+        "الروابط تعمل بشكل صحيح لجميع العملات"
+      ],
+      "files": [
+        "pages/Favorites.tsx"
+      ]
+    },
     {
       "version": "3.4",
       "date": "2025-12-29",

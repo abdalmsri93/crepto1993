@@ -138,12 +138,14 @@ const Favorites = () => {
                           size="sm"
                           variant="outline"
                           className="flex-1 text-xs h-8"
-                          onClick={() =>
+                          onClick={() => {
+                            // إزالة USDT من نهاية الرمز إذا كان موجوداً
+                            const baseSymbol = coin.symbol.replace(/USDT$/i, '');
                             window.open(
-                              `https://www.binance.com/en/trade/${coin.symbol}_USDT`,
+                              `https://www.binance.com/en/trade/${baseSymbol}_USDT`,
                               "_blank"
-                            )
-                          }
+                            );
+                          }}
                         >
                           📊 Binance
                         </Button>
