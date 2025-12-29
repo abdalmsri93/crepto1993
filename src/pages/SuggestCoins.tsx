@@ -945,7 +945,7 @@ const SuggestCoins = () => {
                       
                       {/* تاريخ إصدار العملة */}
                       <div className="my-2">
-                        <CoinLaunchDate symbol={coin.symbol.replace('USDT', '')} />
+                        <CoinLaunchDate symbol={coin.symbol} />
                       </div>
                       
                       <div className="text-xs mt-2">{coin.riskLevel}</div>

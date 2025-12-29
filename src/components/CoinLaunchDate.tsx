@@ -9,7 +9,9 @@ interface CoinLaunchDateProps {
 }
 
 export const CoinLaunchDate = ({ symbol, showIcon = true, className = "" }: CoinLaunchDateProps) => {
-  const { launchDate, loading } = useCoinMetadata(symbol);
+  // إزالة USDT من نهاية الرمز
+  const cleanSymbol = symbol.replace(/USDT$/i, '');
+  const { launchDate, loading } = useCoinMetadata(cleanSymbol);
 
   if (loading) {
     return (
@@ -23,18 +25,14 @@ export const CoinLaunchDate = ({ symbol, showIcon = true, className = "" }: Coin
     );
   }
 
-  if (!launchDate) {
-    return null;
-  }
-
   return (
     <div className={`flex justify-between items-center text-sm ${className}`}>
       <span className="text-muted-foreground/80 flex items-center gap-1">
         {showIcon && <Calendar className="w-3.5 h-3.5" />}
         📅 تاريخ الإصدار:
       </span>
-      <span className="font-semibold text-crypto-green">
-        {launchDate}
+      <span className={`font-semibold ${launchDate ? 'text-crypto-green' : 'text-muted-foreground/60'}`}>
+        {launchDate || 'غير متوفر'}
       </span>
     </div>
   );
