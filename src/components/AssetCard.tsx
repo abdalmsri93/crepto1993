@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, ExternalLink, Calendar, Tag, Loader2, Plus, DollarSign, Wallet } from "lucide-react";
+import { TrendingUp, ExternalLink, Calendar, Tag, Loader2, Plus, DollarSign, Wallet, ChevronDown, ChevronUp } from "lucide-react";
 import { useCoinMetadata } from "@/hooks/useCoinMetadata";
 
 interface AssetCardProps {
@@ -52,6 +52,13 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   // 💵 حالة مبلغ الاستثمار الأصلي
   const [investmentAmount, setInvestmentAmount] = useState<string>("");
   const [savedInvestment, setSavedInvestment] = useState<number>(0);
+  
+  // 📂 حالة طي/توسيع البطاقة (مطوية بشكل افتراضي)
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem(`collapsed_${asset}`);
+    // مطوية بشكل افتراضي إلا إذا فتحها المستخدم سابقاً
+    return saved !== 'false';
+  });
   
   // تحميل مبلغ التعزيز المحفوظ عند التحميل
   useEffect(() => {
@@ -104,6 +111,14 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     localStorage.removeItem(`investment_${asset}`);
   };
   
+  // 📂 تبديل حالة الطي/التوسيع
+  const handleToggleCollapse = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    localStorage.setItem(`collapsed_${asset}`, newState.toString());
+  };
+  
   const handleAssetClick = () => {
     const binanceUrl = getBinanceUrl(asset);
     window.open(binanceUrl, "_blank");
@@ -134,69 +149,24 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
               <p className="text-xs text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">عملة رقمية</p>
             </div>
           </div>
-          <div className={`flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-lg transition-all duration-300 ${isPositive ? 'bg-crypto-green/10 text-crypto-green' : 'bg-red-500/10 text-red-500'}`}>
-            <TrendingUp className={`w-4 h-4 ${!isPositive && 'rotate-180'} transition-transform duration-300`} />
-            <span className="font-orbitron">{isPositive ? '+' : ''}{percentage.toFixed(2)}%</span>
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-lg transition-all duration-300 ${isPositive ? 'bg-crypto-green/10 text-crypto-green' : 'bg-red-500/10 text-red-500'}`}>
+              <TrendingUp className={`w-4 h-4 ${!isPositive && 'rotate-180'} transition-transform duration-300`} />
+              <span className="font-orbitron">{isPositive ? '+' : ''}{percentage.toFixed(2)}%</span>
+            </div>
+            {/* زر الطي/التوسيع */}
+            <button
+              onClick={handleToggleCollapse}
+              className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-300 hover:scale-110"
+              title={isCollapsed ? "توسيع" : "طي"}
+            >
+              {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            </button>
           </div>
         </div>
         
         <div className="space-y-3">
-          {currentPrice && (
-            <div className="flex justify-between items-end pb-3 border-b border-primary/20 hover:border-primary/40 transition-colors">
-              <span className="text-muted-foreground/80 text-sm font-medium">السعر الحالي</span>
-              <span className="font-orbitron text-crypto-gold font-bold group-hover:scale-110 transition-transform origin-right inline-block">
-                ${parseFloat(currentPrice).toLocaleString(undefined, { maximumFractionDigits: 8 })}
-              </span>
-            </div>
-          )}
-          <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
-            <span className="text-muted-foreground/80 text-sm font-medium">الكمية</span>
-            <span className="font-orbitron text-foreground font-semibold">
-              {parseFloat(total).toFixed(8)}
-            </span>
-          </div>
-          
-          {/* الفئة وتاريخ الإصدار */}
-          {loading ? (
-            <div className="flex justify-center items-center py-3 px-2">
-              <Loader2 className="w-4 h-4 animate-spin text-primary mr-2" />
-              <span className="text-xs text-muted-foreground">جاري التحميل...</span>
-            </div>
-          ) : !launchDate && !category ? (
-            <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
-              <span className="text-muted-foreground/80 text-sm font-medium">معلومات</span>
-              <span className="text-xs text-amber-500 font-semibold">
-                غير متوفر
-              </span>
-            </div>
-          ) : (
-            <>
-              {category && (
-                <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
-                  <div className="flex items-center gap-1.5 text-muted-foreground/80 text-sm font-medium">
-                    <Tag className="w-3.5 h-3.5" />
-                    الفئة
-                  </div>
-                  <span className="bg-gradient-to-r from-primary/20 to-secondary/20 px-2.5 py-1 rounded-full text-xs font-semibold text-primary">
-                    {category}
-                  </span>
-                </div>
-              )}
-              
-              {launchDate && (
-                <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
-                  <div className="flex items-center gap-1.5 text-muted-foreground/80 text-sm font-medium">
-                    <Calendar className="w-3.5 h-3.5" />
-                    تاريخ الإصدار
-                  </div>
-                  <span className="font-orbitron text-crypto-green text-sm font-semibold">
-                    {launchDate}
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-          
+          {/* القيمة الإجمالية - تظهر دائماً */}
           <div className="flex justify-between items-end bg-gradient-to-r from-primary/10 to-secondary/10 px-3 py-3 rounded-lg border border-primary/20">
             <span className="text-muted-foreground/80 text-sm font-medium">القيمة الإجمالية</span>
             <span className="font-orbitron text-crypto-gold text-lg font-black transition-all duration-300 group-hover:scale-125 origin-right inline-block">
@@ -204,108 +174,187 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
             </span>
           </div>
           
-          {/* � قسم مبلغ الاستثمار الأصلي */}
-          <div className="mt-3 p-3 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-lg border border-blue-500/30">
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex items-center gap-1.5 text-blue-400 text-sm font-semibold">
-                <Wallet className="w-4 h-4" />
-                مبلغ الاستثمار
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-orbitron text-blue-400 font-bold text-lg">
-                  ${savedInvestment.toLocaleString()}
+          {/* 💎 قسم المجموع الكلي - يظهر دائماً */}
+          {(savedInvestment > 0 || totalBoost > 0) && (
+            <div className="p-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5 text-purple-400 text-sm font-semibold">
+                  <DollarSign className="w-4 h-4" />
+                  المجموع الكلي
+                </div>
+                <span className="font-orbitron text-purple-400 font-bold text-xl">
+                  ${(savedInvestment + totalBoost).toLocaleString()}
                 </span>
-                {savedInvestment > 0 && (
-                  <button
-                    onClick={handleResetInvestment}
-                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                    title="إعادة تعيين"
-                  >
-                    ✕
-                  </button>
-                )}
               </div>
+              <p className="text-xs text-muted-foreground/60 mt-1 text-right">
+                الاستثمار + التعزيزات
+              </p>
             </div>
-            
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={investmentAmount}
-                onChange={(e) => setInvestmentAmount(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="أدخل المبلغ..."
-                className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-blue-500/30 focus:border-blue-500 focus:outline-none text-right"
-              />
-              <Button
-                size="sm"
-                onClick={handleSaveInvestment}
-                disabled={!investmentAmount || parseFloat(investmentAmount) <= 0}
-                className="bg-blue-500 hover:bg-blue-600 text-white gap-1"
-              >
-                <Plus className="w-4 h-4" />
-                حفظ
-              </Button>
-            </div>
-          </div>
+          )}
           
-          {/* �💰 قسم مبلغ التعزيز */}
-          <div className="mt-3 p-3 bg-gradient-to-r from-emerald-500/10 to-green-500/10 rounded-lg border border-emerald-500/30">
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-semibold">
-                <DollarSign className="w-4 h-4" />
-                إجمالي التعزيزات
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-orbitron text-emerald-400 font-bold text-lg">
-                  ${totalBoost.toLocaleString()}
+          {/* التفاصيل القابلة للطي */}
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100'}`}>
+            <div className="space-y-3 pt-2">
+              {currentPrice && (
+                <div className="flex justify-between items-end pb-3 border-b border-primary/20 hover:border-primary/40 transition-colors">
+                  <span className="text-muted-foreground/80 text-sm font-medium">السعر الحالي</span>
+                  <span className="font-orbitron text-crypto-gold font-bold group-hover:scale-110 transition-transform origin-right inline-block">
+                    ${parseFloat(currentPrice).toLocaleString(undefined, { maximumFractionDigits: 8 })}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
+                <span className="text-muted-foreground/80 text-sm font-medium">الكمية</span>
+                <span className="font-orbitron text-foreground font-semibold">
+                  {parseFloat(total).toFixed(8)}
                 </span>
-                {totalBoost > 0 && (
-                  <button
-                    onClick={handleResetBoost}
-                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                    title="إعادة تعيين"
+              </div>
+              
+              {/* الفئة وتاريخ الإصدار */}
+              {loading ? (
+                <div className="flex justify-center items-center py-3 px-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary mr-2" />
+                  <span className="text-xs text-muted-foreground">جاري التحميل...</span>
+                </div>
+              ) : !launchDate && !category ? (
+                <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
+                  <span className="text-muted-foreground/80 text-sm font-medium">معلومات</span>
+                  <span className="text-xs text-amber-500 font-semibold">
+                    غير متوفر
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {category && (
+                    <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
+                      <div className="flex items-center gap-1.5 text-muted-foreground/80 text-sm font-medium">
+                        <Tag className="w-3.5 h-3.5" />
+                        الفئة
+                      </div>
+                      <span className="bg-gradient-to-r from-primary/20 to-secondary/20 px-2.5 py-1 rounded-full text-xs font-semibold text-primary">
+                        {category}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {launchDate && (
+                    <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
+                      <div className="flex items-center gap-1.5 text-muted-foreground/80 text-sm font-medium">
+                        <Calendar className="w-3.5 h-3.5" />
+                        تاريخ الإصدار
+                      </div>
+                      <span className="font-orbitron text-crypto-green text-sm font-semibold">
+                        {launchDate}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {/* 💵 قسم مبلغ الاستثمار الأصلي */}
+              <div className="mt-3 p-3 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-lg border border-blue-500/30">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-1.5 text-blue-400 text-sm font-semibold">
+                    <Wallet className="w-4 h-4" />
+                    مبلغ الاستثمار
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-orbitron text-blue-400 font-bold text-lg">
+                      ${savedInvestment.toLocaleString()}
+                    </span>
+                    {savedInvestment > 0 && (
+                      <button
+                        onClick={handleResetInvestment}
+                        className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                        title="إعادة تعيين"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={investmentAmount}
+                    onChange={(e) => setInvestmentAmount(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="أدخل المبلغ..."
+                    className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-blue-500/30 focus:border-blue-500 focus:outline-none text-right"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSaveInvestment}
+                    disabled={!investmentAmount || parseFloat(investmentAmount) <= 0}
+                    className="bg-blue-500 hover:bg-blue-600 text-white gap-1"
                   >
-                    ✕
-                  </button>
-                )}
+                    <Plus className="w-4 h-4" />
+                    حفظ
+                  </Button>
+                </div>
+              </div>
+              
+              {/* 💰 قسم مبلغ التعزيز */}
+              <div className="mt-3 p-3 bg-gradient-to-r from-emerald-500/10 to-green-500/10 rounded-lg border border-emerald-500/30">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-semibold">
+                    <DollarSign className="w-4 h-4" />
+                    إجمالي التعزيزات
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-orbitron text-emerald-400 font-bold text-lg">
+                      ${totalBoost.toLocaleString()}
+                    </span>
+                    {totalBoost > 0 && (
+                      <button
+                        onClick={handleResetBoost}
+                        className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                        title="إعادة تعيين"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={boostAmount}
+                    onChange={(e) => setBoostAmount(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="أدخل المبلغ..."
+                    className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-emerald-500/30 focus:border-emerald-500 focus:outline-none text-right"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleAddBoost}
+                    disabled={!boostAmount || parseFloat(boostAmount) <= 0}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    إضافة
+                  </Button>
+                </div>
+              </div>
+              
+              {/* 💎 قسم المجموع الكلي - داخل القسم القابل للطي */}
+              <div className="mt-3 p-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5 text-purple-400 text-sm font-semibold">
+                    <DollarSign className="w-4 h-4" />
+                    المجموع الكلي
+                  </div>
+                  <span className="font-orbitron text-purple-400 font-bold text-xl">
+                    ${(savedInvestment + totalBoost).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground/60 mt-1 text-right">
+                  الاستثمار + التعزيزات
+                </p>
               </div>
             </div>
-            
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={boostAmount}
-                onChange={(e) => setBoostAmount(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="أدخل المبلغ..."
-                className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-emerald-500/30 focus:border-emerald-500 focus:outline-none text-right"
-              />
-              <Button
-                size="sm"
-                onClick={handleAddBoost}
-                disabled={!boostAmount || parseFloat(boostAmount) <= 0}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1"
-              >
-                <Plus className="w-4 h-4" />
-                إضافة
-              </Button>
-            </div>
-          </div>
-          
-          {/* 💎 قسم المجموع الكلي */}
-          <div className="mt-3 p-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-1.5 text-purple-400 text-sm font-semibold">
-                <DollarSign className="w-4 h-4" />
-                المجموع الكلي
-              </div>
-              <span className="font-orbitron text-purple-400 font-bold text-xl">
-                ${(savedInvestment + totalBoost).toLocaleString()}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground/60 mt-1 text-right">
-              الاستثمار + التعزيزات
-            </p>
           </div>
         </div>
       </CardContent>
