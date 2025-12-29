@@ -1,6 +1,19 @@
 {
-  "currentVersion": "3.3",
+  "currentVersion": "3.4",
   "versions": [
+    {
+      "version": "3.4",
+      "date": "2025-12-29",
+      "description": "تحسين طي البطاقات - مطوية دائماً عند التحديث",
+      "features": [
+        "جميع البطاقات مطوية دائماً عند فتح الموقع",
+        "جميع البطاقات مطوية عند تحديث الصفحة",
+        "إزالة حفظ حالة الطي في localStorage"
+      ],
+      "files": [
+        "components/AssetCard.tsx"
+      ]
+    },
     {
       "version": "3.3",
       "date": "2025-12-29",

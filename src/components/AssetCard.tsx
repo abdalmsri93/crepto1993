@@ -53,12 +53,8 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const [investmentAmount, setInvestmentAmount] = useState<string>("");
   const [savedInvestment, setSavedInvestment] = useState<number>(0);
   
-  // 📂 حالة طي/توسيع البطاقة (مطوية بشكل افتراضي)
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`collapsed_${asset}`);
-    // مطوية بشكل افتراضي إلا إذا فتحها المستخدم سابقاً
-    return saved !== 'false';
-  });
+  // 📂 حالة طي/توسيع البطاقة (مطوية بشكل افتراضي دائماً)
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
   
   // تحميل مبلغ التعزيز المحفوظ عند التحميل
   useEffect(() => {
@@ -114,9 +110,7 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   // 📂 تبديل حالة الطي/التوسيع
   const handleToggleCollapse = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const newState = !isCollapsed;
-    setIsCollapsed(newState);
-    localStorage.setItem(`collapsed_${asset}`, newState.toString());
+    setIsCollapsed(!isCollapsed);
   };
   
   const handleAssetClick = () => {
