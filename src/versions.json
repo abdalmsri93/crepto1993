@@ -1,0 +1,57 @@
+{
+  "currentVersion": "3.3",
+  "versions": [
+    {
+      "version": "3.3",
+      "date": "2025-12-29",
+      "description": "إضافة ميزة طي/توسيع بطاقات العملات",
+      "features": [
+        "ميزة طي/توسيع البطاقات بزر سهم",
+        "البطاقات مطوية بشكل افتراضي",
+        "حفظ حالة الطي لكل عملة",
+        "إظهار القيمة الإجمالية والمجموع الكلي عند الطي",
+        "انيميشن سلس عند الطي والتوسيع"
+      ],
+      "files": [
+        "components/AssetCard.tsx"
+      ]
+    },
+    {
+      "version": "3.2",
+      "date": "2025-12-28",
+      "description": "نسخة محدثة",
+      "features": [
+        "جميع مميزات 3.1",
+        "تحسينات إضافية"
+      ],
+      "files": [
+        "App.tsx",
+        "components/AssetCard.tsx",
+        "components/VersionBadge.tsx",
+        "pages/SuggestCoins.tsx",
+        "pages/Favorites.tsx",
+        "pages/Index.tsx"
+      ]
+    },
+    {
+      "version": "3.1",
+      "date": "2025-12-28",
+      "description": "إضافة ميزة مبلغ التعزيز التراكمي + شارة الإصدار",
+      "features": [
+        "حقل إدخال مبلغ التعزيز لكل عملة في المحفظة",
+        "جمع تراكمي للمبالغ مع حفظ تلقائي",
+        "زر إعادة تعيين المبلغ",
+        "شارة رقم الإصدار في أسفل الشاشة",
+        "تصميم جميل مع تأثيرات حركية"
+      ],
+      "files": [
+        "App.tsx",
+        "components/AssetCard.tsx",
+        "components/VersionBadge.tsx",
+        "pages/SuggestCoins.tsx",
+        "pages/Favorites.tsx",
+        "pages/Index.tsx"
+      ]
+    }
+  ]
+}
