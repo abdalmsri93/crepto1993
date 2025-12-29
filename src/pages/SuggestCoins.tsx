@@ -10,6 +10,7 @@ import { Loader2, Sparkles, ArrowRight, ExternalLink, Info, Star } from "lucide-
 import { NavLink } from "@/components/NavLink";
 import { getDualAIAnalysis, isAIConfigured } from "@/lib/ai-analysis";
 import type { DualAnalysis } from "@/lib/ai-analysis";
+import { CoinLaunchDate } from "@/components/CoinLaunchDate";
 
 // 🔧 دالة لحساب معايير Binance تلقائياً من البيانات الحية
 function calculateBinanceMetrics(ticker: any, allTickers: any[]) {
@@ -941,6 +942,12 @@ const SuggestCoins = () => {
                       <div className={`text-sm ${coin.growth.includes('+') ? 'text-green-600' : 'text-red-600'}`}>
                         {coin.growth}
                       </div>
+                      
+                      {/* تاريخ إصدار العملة */}
+                      <div className="my-2">
+                        <CoinLaunchDate symbol={coin.symbol.replace('USDT', '')} />
+                      </div>
+                      
                       <div className="text-xs mt-2">{coin.riskLevel}</div>
                       <div className="text-xs">{coin.recommendation}</div>
                       
