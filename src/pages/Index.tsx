@@ -90,6 +90,38 @@ const Index = () => {
 
       console.log('Portfolio data received:', data);
       
+      // حفظ عملات المحفظة في localStorage للفلترة التلقائية للمفضلات
+      if (data && data.balances && data.balances.length > 0) {
+        const portfolioAssets = data.balances.map((b: any) => b.asset.toUpperCase());
+        localStorage.setItem('binance_portfolio_assets', JSON.stringify(portfolioAssets));
+        console.log('📦 حفظ عملات المحفظة:', portfolioAssets);
+        
+        // حذف العملات من المفضلات إذا أصبحت في المحفظة
+        const favoritesKey = 'binance_watch_favorites';
+        const savedFavorites = localStorage.getItem(favoritesKey);
+        if (savedFavorites) {
+          try {
+            const favorites = JSON.parse(savedFavorites);
+            const portfolioSet = new Set(portfolioAssets);
+            const filteredFavorites = favorites.filter((fav: any) => {
+              const symbolWithoutUSDT = fav.symbol.replace(/USDT$/i, '').toUpperCase();
+              const isInPortfolio = portfolioSet.has(symbolWithoutUSDT) || portfolioSet.has(fav.symbol.toUpperCase());
+              if (isInPortfolio) {
+                console.log(`🗑️ حذف ${fav.symbol} من المفضلات (موجودة في المحفظة)`);
+              }
+              return !isInPortfolio;
+            });
+            
+            if (filteredFavorites.length !== favorites.length) {
+              localStorage.setItem(favoritesKey, JSON.stringify(filteredFavorites));
+              console.log(`📋 تم تحديث المفضلات: ${favorites.length} → ${filteredFavorites.length}`);
+            }
+          } catch (e) {
+            console.error('Error filtering favorites:', e);
+          }
+        }
+      }
+      
       if (data && data.balances && data.balances.length === 0 && data.message) {
         console.warn('Empty portfolio:', data.message);
         toast({
