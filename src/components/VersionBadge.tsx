@@ -2,7 +2,7 @@ import React from "react";
 import { Sparkles } from "lucide-react";
 
 // 📦 رقم الإصدار الحالي
-export const APP_VERSION = "4.0";
+export const APP_VERSION = "4.1";
 
 export const VersionBadge = () => {
   return (

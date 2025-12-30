@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,10 +7,27 @@ import { useFavorites } from "@/hooks/useFavorites";
 import { CoinLaunchDate } from "@/components/CoinLaunchDate";
 import { CoinProject } from "@/components/CoinProject";
 import { CoinCategory } from "@/components/CoinCategory";
+import { getCoinLaunchDateISO } from "@/hooks/useCoinMetadata";
 
 const Favorites = () => {
   const navigate = useNavigate();
   const { favorites, removeFavorite, count, isLoading } = useFavorites();
+
+  // ترتيب المفضلات حسب تاريخ الإطلاق (الأحدث أولاً)
+  const sortedFavoritesByLaunchDate = useMemo(() => {
+    return [...favorites].sort((a, b) => {
+      const dateA = getCoinLaunchDateISO(a.symbol);
+      const dateB = getCoinLaunchDateISO(b.symbol);
+      
+      // العملات بدون تاريخ تأتي في النهاية
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      
+      // ترتيب تنازلي (الأحدث أولاً)
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
+  }, [favorites]);
 
   if (isLoading) {
     return (
@@ -61,6 +78,9 @@ const Favorites = () => {
               <h2 className="text-2xl font-bold font-orbitron flex items-center gap-2">
                 <Trophy className="w-6 h-6 text-crypto-gold" />
                 العملات المحفوظة ({count})
+                <span className="text-sm font-normal text-muted-foreground mr-2">
+                  • مرتبة بتاريخ الإطلاق (الأحدث أولاً)
+                </span>
               </h2>
               <Button
                 variant="outline"
@@ -74,7 +94,7 @@ const Favorites = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {favorites.map((coin, index) => (
+              {sortedFavoritesByLaunchDate.map((coin, index) => (
                 <Card
                   key={coin.symbol}
                   className="border-primary/20 hover:border-crypto-gold/50 transition-all duration-300 hover:shadow-lg hover:shadow-crypto-gold/20 overflow-hidden"
@@ -83,13 +103,19 @@ const Favorites = () => {
                     <div className="text-right space-y-3">
                       {/* الرمز والعدد */}
                       <div className="flex items-start justify-between">
-                        <button
-                          onClick={() => removeFavorite(coin.symbol)}
-                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10 p-1 rounded transition"
-                          title="حذف من المفضلة"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => removeFavorite(coin.symbol)}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10 p-1 rounded transition"
+                            title="حذف من المفضلة"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          {/* رقم الترتيب */}
+                          <div className="bg-gradient-to-r from-crypto-gold to-orange-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow">
+                            {index + 1}
+                          </div>
+                        </div>
                         <div>
                           <div className="font-bold text-lg text-crypto-gold">
                             {coin.symbol}
