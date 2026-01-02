@@ -19,6 +19,7 @@ interface Balance {
   priceChangePercent?: string;
   currentPrice?: string;
   dayPnL?: string;
+  investmentAmount?: string;
 }
 
 interface PortfolioData {
@@ -296,6 +297,7 @@ const Index = () => {
                     usdValue={balance.usdValue}
                     priceChangePercent={balance.priceChangePercent}
                     currentPrice={balance.currentPrice}
+                    investmentAmount={balance.investmentAmount}
                   />
                 </div>
               ))}

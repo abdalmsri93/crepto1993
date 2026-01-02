@@ -3,6 +3,65 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 console.log('Binance Portfolio Function Starting...');
 
+// دالة لإنشاء التوقيع
+async function createSignature(queryString: string, apiSecret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(apiSecret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(queryString));
+  return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// دالة لجلب مبلغ الاستثمار من سجل الصفقات
+async function fetchInvestmentAmount(symbol: string, apiKey: string, apiSecret: string): Promise<number> {
+  try {
+    const tradingPair = `${symbol}USDT`;
+    const timestamp = Date.now();
+    const queryString = `symbol=${tradingPair}&timestamp=${timestamp}`;
+    const signature = await createSignature(queryString, apiSecret);
+
+    const response = await fetch(
+      `https://api.binance.com/api/v3/myTrades?${queryString}&signature=${signature}`,
+      { headers: { 'X-MBX-APIKEY': apiKey } }
+    );
+
+    if (!response.ok) return 0;
+
+    const trades = await response.json();
+    
+    let totalInvestment = 0;
+    let totalQuantityBought = 0;
+    let totalSellValue = 0;
+    let totalQuantitySold = 0;
+
+    trades.forEach((trade: any) => {
+      const quoteQty = parseFloat(trade.quoteQty);
+      const qty = parseFloat(trade.qty);
+      if (trade.isBuyer) {
+        totalInvestment += quoteQty;
+        totalQuantityBought += qty;
+      } else {
+        totalSellValue += quoteQty;
+        totalQuantitySold += qty;
+      }
+    });
+
+    const avgBuyPrice = totalQuantityBought > 0 ? totalInvestment / totalQuantityBought : 0;
+    const netQuantity = totalQuantityBought - totalQuantitySold;
+    const costBasis = netQuantity * avgBuyPrice;
+
+    return costBasis;
+  } catch (e) {
+    console.error(`Error fetching trades for ${symbol}:`, e);
+    return 0;
+  }
+}
+
 function getUserIdFromAuthHeader(authHeader: string | null): string | null {
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return null;
   const token = authHeader.split(' ')[1];
@@ -193,6 +252,19 @@ Deno.serve(async (req) => {
     });
 
     // Calculate USD values and get 24h change for each balance
+    // جلب مبالغ الاستثمار لكل عملة بالتوازي
+    const investmentPromises = balances.map(async (balance: any) => {
+      const asset = balance.asset;
+      if (['USDT', 'USDC', 'BUSD', 'FDUSD'].includes(asset)) {
+        return { asset, investment: 0 };
+      }
+      const investment = await fetchInvestmentAmount(asset, apiKey, apiSecret);
+      return { asset, investment };
+    });
+    
+    const investmentResults = await Promise.all(investmentPromises);
+    const investmentMap = new Map(investmentResults.map(r => [r.asset, r.investment]));
+    
     const enrichedBalances = balances.map((balance: any) => {
       let usdValue = 0;
       let priceChange = 0;
@@ -241,16 +313,21 @@ Deno.serve(async (req) => {
         }
       }
 
+      // إضافة مبلغ الاستثمار
+      const investmentAmount = investmentMap.get(asset) || 0;
+
       const result = {
         ...balance,
         currentPrice: currentPrice.toFixed(8),
         usdValue: usdValue.toFixed(2),
         dayPnL: dayPnL.toFixed(2),
         priceChangePercent: priceChange.toFixed(2),
+        investmentAmount: investmentAmount.toFixed(2), // 💰 مبلغ الاستثمار
       };
       
       console.log(`[${asset}] Result:`, result);
       return result;
+    });
 
     // Sort by USD value
     enrichedBalances.sort((a: any, b: any) => parseFloat(b.usdValue) - parseFloat(a.usdValue));
