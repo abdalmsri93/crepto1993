@@ -1,11 +1,49 @@
 /**
  * 🔄 Context البحث التلقائي - يعمل في الخلفية دائماً
  * لا يتوقف عند تغيير الصفحات
+ * ✅ يستخدم نفس معايير البحث اليدوي
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { SearchCoin, applySmartFilters, rankCoins } from '@/utils/advancedSearch';
+import { SearchCoin } from '@/utils/advancedSearch';
 import { getDualAIAnalysis, DualAnalysis } from '@/lib/ai-analysis';
+
+// 🔧 دالة لحساب معايير Binance تلقائياً (نفس البحث اليدوي)
+function calculateBinanceMetrics(ticker: any) {
+  const volume24h = parseFloat(ticker.quoteVolume || 0);
+  const priceChangePercent = parseFloat(ticker.priceChangePercent || 0);
+  
+  // حساب السيولة بناءً على الحجم
+  let liquidity = "منخفضة";
+  if (volume24h >= 1000000) liquidity = "عالية";
+  else if (volume24h >= 500000) liquidity = "متوسطة";
+  
+  // حساب مستوى المخاطرة بناءً على التقلب والحجم
+  let riskLevel = "متوسط";
+  if (Math.abs(priceChangePercent) <= 3 && volume24h >= 500000) {
+    riskLevel = "منخفض";
+  } else if (Math.abs(priceChangePercent) > 10 || volume24h < 500000) {
+    riskLevel = "عالي";
+  }
+  
+  // حساب درجة الأداء
+  const stabilityScore = Math.max(0, 10 - Math.abs(priceChangePercent));
+  const volumeScore = Math.min(10, (volume24h / 5000000) * 10);
+  let performanceScore = Math.round((stabilityScore + volumeScore) / 2);
+  performanceScore = Math.min(10, Math.max(1, performanceScore));
+  
+  // التوصية بناءً على التغير السعري
+  let recommendation = "💼 احتفاظ";
+  if (priceChangePercent > 2) recommendation = "✅ شراء";
+  else if (priceChangePercent < -2) recommendation = "📉 بيع";
+  
+  return {
+    liquidity,
+    riskLevel,
+    performanceScore,
+    recommendation,
+  };
+}
 
 // ثوابت النظام
 const DEFAULT_INTERVAL = 5 * 60 * 1000; // 5 دقائق
@@ -108,7 +146,7 @@ function getUSDTBalance(): number {
   }
 }
 
-// جلب وفلترة العملات
+// جلب وفلترة العملات (نفس معايير البحث اليدوي)
 async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Promise<SearchCoin[]> {
   try {
     const controller = new AbortController();
@@ -124,12 +162,84 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
     }
     
     const tickers = await response.json();
-    const filtered = applySmartFilters(tickers, {
-      priceMin: priceRange.min,
-      priceMax: priceRange.max
+    
+    console.log(`📊 عدد العملات المتاحة: ${tickers.length}`);
+    console.log(`🔍 البحث عن: USDT pairs, السعر: $${priceRange.min}-$${priceRange.max}, الحجم: >= $50K`);
+    
+    // 1. تصفية أزواج USDT فقط
+    const usdtCoins = tickers.filter((t: any) => t.symbol.endsWith('USDT'));
+    console.log(`📊 USDT Pairs: ${usdtCoins.length}`);
+    
+    // 2. فلترة السعر
+    const priceFilteredCoins = usdtCoins.filter((t: any) => {
+      const price = parseFloat(t.lastPrice || 0);
+      return price >= priceRange.min && price <= priceRange.max;
+    });
+    console.log(`📈 بعد فلتر السعر: ${priceFilteredCoins.length}`);
+    
+    // 3. فلترة حجم التداول (>= $50,000) - نفس البحث اليدوي
+    const volumeFilteredCoins = priceFilteredCoins.filter((t: any) => {
+      const volume = parseFloat(t.quoteVolume || 0);
+      return volume >= 50000;
+    });
+    console.log(`💰 بعد فلتر الحجم (50K): ${volumeFilteredCoins.length}`);
+    
+    // 4. تحويل لصيغة SearchCoin مع حساب المعايير
+    let coins: SearchCoin[] = volumeFilteredCoins.map((ticker: any) => {
+      const price = parseFloat(ticker.lastPrice);
+      const quoteVolume = parseFloat(ticker.quoteVolume || 0);
+      const symbol = ticker.symbol.replace('USDT', '');
+      const priceChangePercent = parseFloat(ticker.priceChangePercent);
+      const metrics = calculateBinanceMetrics(ticker);
+      
+      return {
+        symbol: symbol,
+        name: symbol,
+        price: price,
+        priceChange24h: priceChangePercent,
+        volume24h: quoteVolume,
+        volumePrice: quoteVolume,
+        marketCap: quoteVolume, // نستخدم الحجم كتقدير
+        rank: 0,
+        category: 'Binance Direct',
+        score: metrics.performanceScore,
+        liquidity: metrics.liquidity,
+        riskLevel: metrics.riskLevel,
+        recommendation: metrics.recommendation,
+        performanceScore: metrics.performanceScore,
+      };
     });
     
-    return rankCoins(filtered);
+    console.log(`✅ تم جلب ${coins.length} عملة من Binance بعد الفلاتر الأساسية`);
+    
+    // 5. فلترة بناءً على Market Cap (>= $100K)
+    coins = coins.filter(coin => coin.volume24h >= 100000);
+    console.log(`بعد فلتر Market Cap: ${coins.length}`);
+    
+    // 6. فلترة السيولة (عالية أو متوسطة فقط)
+    coins = coins.filter(coin => 
+      coin.liquidity === "عالية" || coin.liquidity === "متوسطة"
+    );
+    console.log(`بعد فلتر السيولة: ${coins.length}`);
+    
+    // 7. فلترة مستوى المخاطرة (منخفض أو متوسط فقط)
+    coins = coins.filter(coin => 
+      coin.riskLevel === "منخفض" || coin.riskLevel === "متوسط"
+    );
+    console.log(`بعد فلتر مستوى المخاطرة: ${coins.length}`);
+    
+    // 8. ترتيب حسب درجة الأداء
+    coins.sort((a, b) => (b.performanceScore || 0) - (a.performanceScore || 0));
+    
+    // إضافة الترتيب
+    coins = coins.map((coin, index) => ({
+      ...coin,
+      rank: index + 1
+    }));
+    
+    console.log(`✅ النتيجة النهائية: ${coins.length} عملة`);
+    
+    return coins;
   } catch (error: any) {
     console.error('❌ خطأ في جلب العملات:', error.message);
     throw error;
