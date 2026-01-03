@@ -10,7 +10,6 @@ interface AssetCardProps {
   usdValue: string;
   priceChangePercent?: string;
   currentPrice?: string;
-  investmentAmount?: string; // 💰 مبلغ الاستثمار من Binance
 }
 
 const COIN_LOGOS: Record<string, string> = {
@@ -38,7 +37,7 @@ const getBinanceUrl = (asset: string): string => {
   return `https://www.binance.com/en/trade/${symbol}_USDT`;
 };
 
-export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentPrice, investmentAmount: apiInvestment }: AssetCardProps) => {
+export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentPrice }: AssetCardProps) => {
   const percentage = priceChangePercent ? parseFloat(priceChangePercent) : 0;
   const isPositive = percentage >= 0;
   const logoUrl = COIN_LOGOS[asset] || "https://cryptologos.cc/logos/generic-crypto-logo.png";
@@ -51,7 +50,7 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const [totalBoost, setTotalBoost] = useState<number>(0);
   
   // 💵 حالة مبلغ الاستثمار الأصلي
-  const [manualInvestment, setManualInvestment] = useState<string>("");
+  const [investmentAmount, setInvestmentAmount] = useState<string>("");
   const [savedInvestment, setSavedInvestment] = useState<number>(0);
   
   // 📂 حالة طي/توسيع البطاقة (مطوية بشكل افتراضي دائماً)
@@ -64,17 +63,12 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
       setTotalBoost(parseFloat(savedBoost));
     }
     
-    // تحميل مبلغ الاستثمار المحفوظ أو استخدام القيمة من API
+    // تحميل مبلغ الاستثمار المحفوظ
     const savedInv = localStorage.getItem(`investment_${asset}`);
     if (savedInv) {
       setSavedInvestment(parseFloat(savedInv));
-    } else if (apiInvestment && parseFloat(apiInvestment) > 0) {
-      // استخدام مبلغ الاستثمار من Binance API
-      const investValue = parseFloat(apiInvestment);
-      setSavedInvestment(investValue);
-      localStorage.setItem(`investment_${asset}`, investValue.toString());
     }
-  }, [asset, apiInvestment]);
+  }, [asset]);
   
   // إضافة مبلغ تعزيز جديد
   const handleAddBoost = (e: React.MouseEvent) => {
@@ -110,7 +104,6 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const handleResetInvestment = (e: React.MouseEvent) => {
     e.stopPropagation();
     setSavedInvestment(0);
-    setInvestmentFetched(false); // السماح بإعادة الجلب
     localStorage.removeItem(`investment_${asset}`);
   };
   

@@ -11,6 +11,3 @@ verify_jwt = false
 
 [functions.enrich-coin]
 verify_jwt = false
-
-[functions.trade-history]
-verify_jwt = false
