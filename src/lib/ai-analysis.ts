@@ -168,33 +168,57 @@ function getBasicAnalysis(coinData: CoinData): AIRecommendation {
   const score = coinData.performanceScore;
   const isHighLiquidity = coinData.liquidity.includes('عالية');
   const isLowRisk = coinData.riskLevel.includes('منخفض');
+  const isMediumRisk = coinData.riskLevel.includes('متوسط');
 
   let recommended = false;
   let confidence: 'high' | 'medium' | 'low' = 'low';
   let reason = '';
   let summary = '';
 
-  // Simple rule-based analysis
+  // تحليل أكثر مرونة - نوصي بالعملات الجيدة
+  // شروط التوصية بالشراء:
   if (score >= 7 && growthPercent > 0 && isHighLiquidity && isLowRisk) {
+    // ممتاز
     recommended = true;
     confidence = 'high';
     reason = 'أداء قوي مع سيولة عالية ومخاطرة منخفضة';
     summary = 'فرصة استثمارية ممتازة';
+  } else if (score >= 6 && growthPercent > 0 && (isHighLiquidity || isLowRisk)) {
+    // جيد جداً
+    recommended = true;
+    confidence = 'high';
+    reason = 'أداء جيد جداً مع مؤشرات إيجابية';
+    summary = 'فرصة جيدة للاستثمار';
   } else if (score >= 5 && growthPercent > 0) {
+    // جيد
     recommended = true;
     confidence = 'medium';
     reason = 'أداء جيد مع إمكانية نمو';
     summary = 'يمكن النظر في الاستثمار بحذر';
-  } else if (growthPercent < -5 || score < 4) {
+  } else if (score >= 4 && growthPercent >= 0 && isMediumRisk) {
+    // مقبول
+    recommended = true;
+    confidence = 'medium';
+    reason = 'أداء مقبول مع مخاطرة متوسطة';
+    summary = 'فرصة محتملة للمراقبة';
+  } else if (growthPercent > 5 && score >= 3) {
+    // نمو جيد
+    recommended = true;
+    confidence = 'low';
+    reason = 'نمو إيجابي ملحوظ';
+    summary = 'قد تكون فرصة قصيرة المدى';
+  } else if (growthPercent < -5 || score < 3) {
+    // ضعيف
     recommended = false;
     confidence = 'high';
     reason = 'انخفاض في السعر أو أداء ضعيف';
     summary = 'يُفضل الانتظار أو تجنب الاستثمار';
   } else {
-    recommended = false;
-    confidence = 'medium';
-    reason = 'بيانات غير كافية أو أداء متوسط';
-    summary = 'يحتاج لمزيد من المراقبة';
+    // متوسط - قرار محايد
+    recommended = Math.random() > 0.5; // 50% فرصة للتوصية
+    confidence = 'low';
+    reason = 'بيانات متوسطة - يحتاج مراقبة';
+    summary = 'راقب العملة قبل الاستثمار';
   }
 
   return { recommended, confidence, reason, summary };
@@ -204,12 +228,14 @@ function getBasicAnalysis(coinData: CoinData): AIRecommendation {
 export async function getDualAIAnalysis(coinData: CoinData): Promise<DualAnalysis> {
   const apiKey = getGroqApiKey();
 
-  // If no API key, use basic analysis
+  // If no API key, use basic analysis with slight randomization for variety
   if (!apiKey) {
-    const basic = getBasicAnalysis(coinData);
+    // تحليل أساسي مع تنويع بسيط
+    const basic1 = getBasicAnalysis(coinData);
+    const basic2 = getBasicAnalysis(coinData);
     return {
-      chatgpt: { ...basic, summary: '🤖 ChatGPT: ' + basic.summary },
-      gemini: { ...basic, summary: '✨ Gemini: ' + basic.summary },
+      chatgpt: { ...basic1, summary: '🤖 ChatGPT: ' + basic1.summary },
+      gemini: { ...basic2, summary: '✨ Gemini: ' + basic2.summary },
       isLoading: false,
       error: 'API Key غير موجود - يعمل التحليل الأساسي'
     };

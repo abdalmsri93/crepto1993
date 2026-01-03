@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useAutoSearch, AutoSearchLog } from '@/hooks/useAutoSearch';
+import { useAutoSearch, AutoSearchLog } from '@/contexts/AutoSearchContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
