@@ -19,6 +19,12 @@ export interface SearchCoin {
   ageInDays?: number;   // 📆 عمر العملة بالأيام
   isHalal?: boolean;    // 🕌 علامة الحلال
   links?: { website?: string };
+  addedAt?: string;     // 🕐 وقت الإضافة للمفضلات
+  source?: string;      // 📌 مصدر الإضافة (auto-search, manual)
+  recommendation?: string; // 📊 توصية AI
+  priceChange24h?: number; // 📈 التغير في 24 ساعة
+  volume24h?: number;      // 📊 حجم التداول
+  rank?: number;           // 🏆 الترتيب
 }
 
 /**

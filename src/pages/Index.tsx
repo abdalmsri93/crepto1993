@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { PortfolioHeader } from "@/components/PortfolioHeader";
 import { AssetCard } from "@/components/AssetCard";
 import { PortfolioAnalysis } from "@/components/PortfolioAnalysis";
+import { AutoSearchPanel } from "@/components/AutoSearchPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle } from "lucide-react";
+import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/NavLink";
 import type { Session } from "@supabase/supabase-js";
@@ -34,6 +35,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'testing' | 'unknown'>('unknown');
+  const [showAutoSearch, setShowAutoSearch] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -252,13 +254,37 @@ const Index = () => {
               </Button>
             </NavLink>
           </div>
-          <NavLink to="/suggest-coins">
-            <Button className="gap-2 transition-all duration-300 hover:scale-105">
-              <Sparkles className="w-4 h-4" />
-              استكشاف عملات جديدة
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => setShowAutoSearch(!showAutoSearch)}
+              variant={showAutoSearch ? "default" : "outline"}
+              className="gap-2 transition-all duration-300 hover:scale-105 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30 hover:border-green-500/50"
+            >
+              <Zap className="w-4 h-4" />
+              {showAutoSearch ? 'إخفاء البحث التلقائي' : 'البحث التلقائي'}
             </Button>
-          </NavLink>
+            <NavLink to="/suggest-coins">
+              <Button className="gap-2 transition-all duration-300 hover:scale-105">
+                <Sparkles className="w-4 h-4" />
+                استكشاف عملات جديدة
+              </Button>
+            </NavLink>
+          </div>
         </div>
+        {/* لوحة البحث التلقائي */}
+        {showAutoSearch && (
+          <div className="mb-6 animate-fade-in">
+            <AutoSearchPanel 
+              usdtBalance={
+                portfolio?.balances.find(b => b.asset.toUpperCase() === 'USDT')
+                  ? parseFloat(portfolio.balances.find(b => b.asset.toUpperCase() === 'USDT')?.total || '0')
+                  : parseFloat(portfolio?.totalValue || '0')
+              }
+              onClose={() => setShowAutoSearch(false)}
+            />
+          </div>
+        )}
+
         {portfolio && (
           <>
             <PortfolioHeader
