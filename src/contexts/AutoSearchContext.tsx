@@ -364,6 +364,9 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       return;
     }
     
+    console.log('🚀 ======= بدء دورة بحث جديدة =======');
+    console.log(`📊 رقم الدورة التقريبي من الـ status`);
+    
     setStatus(prev => ({ ...prev, isSearching: true, error: null }));
     addLog('info', '🚀 بدء دورة بحث جديدة');
     
@@ -481,14 +484,19 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       });
       
       addLog('success', `✅ انتهت الدورة - أضيف: ${addedInCycle}، تخطي: ${skippedInCycle}`);
+      console.log('✅ ======= انتهت الدورة بنجاح =======');
+      console.log(`📊 الدورات الكلية: ${(settings.totalSearches || 0) + 1}`);
+      console.log(`⏰ الدورة القادمة بعد: ${settingsRef.current.interval / 60000} دقيقة`);
       
     } catch (error: any) {
+      console.error('❌ ======= خطأ في الدورة =======', error);
       addLog('error', `❌ خطأ: ${error.message}`);
       setStatus(prev => ({ ...prev, error: error.message }));
     } finally {
       setStatus(prev => ({ ...prev, isSearching: false, currentCoin: null }));
+      console.log(`🔍 حالة isRunningRef بعد الانتهاء: ${isRunningRef.current}`);
     }
-  }, [addLog]);
+  }, [addLog]); // إزالة settings.totalSearches لمنع إعادة إنشاء الدالة
 
   // بدء البحث
   const startAutoSearch = useCallback(() => {
@@ -514,12 +522,33 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       window.clearInterval(intervalRef.current);
     }
     
-    intervalRef.current = window.setInterval(() => {
-      console.log('⏰ وقت دورة جديدة...');
-      if (isRunningRef.current) {
-        runSearchCycle();
-      }
-    }, settingsRef.current.interval);
+    const scheduleNext = () => {
+      intervalRef.current = window.setInterval(() => {
+        console.log('⏰ وقت دورة جديدة...');
+        console.log(`🔍 isRunningRef: ${isRunningRef.current}`);
+        console.log(`🔍 intervalRef: ${intervalRef.current}`);
+        
+        if (isRunningRef.current) {
+          runSearchCycle().catch(err => {
+            console.error('❌ خطأ في دورة البحث:', err);
+            // إعادة الجدولة حتى لو حدث خطأ
+            if (isRunningRef.current) {
+              console.log('🔄 إعادة جدولة بعد الخطأ...');
+            }
+          });
+        } else {
+          console.log('⚠️ البحث متوقف - تنظيف الـ interval');
+          if (intervalRef.current) {
+            window.clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+        }
+      }, settingsRef.current.interval);
+      
+      console.log(`✅ تم جدولة البحث كل ${settingsRef.current.interval / 60000} دقيقة`);
+    };
+    
+    scheduleNext();
     
     // وقت البحث التالي
     const nextTime = new Date(Date.now() + settingsRef.current.interval);
@@ -612,6 +641,25 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
     });
     addLog('info', '🔄 تم إعادة تعيين الإحصائيات');
   }, [addLog]);
+
+  // التحقق من استمرارية البحث كل 30 ثانية
+  useEffect(() => {
+    const healthCheck = window.setInterval(() => {
+      if (isRunningRef.current && !intervalRef.current) {
+        console.log('🔄 إعادة جدولة البحث - الـ interval توقف');
+        // إعادة الجدولة
+        intervalRef.current = window.setInterval(() => {
+          if (isRunningRef.current) {
+            runSearchCycle().catch(console.error);
+          }
+        }, settingsRef.current.interval);
+      }
+    }, 30000); // كل 30 ثانية
+    
+    return () => {
+      window.clearInterval(healthCheck);
+    };
+  }, [runSearchCycle]);
 
   // تنظيف عند إغلاق التطبيق فقط
   useEffect(() => {
