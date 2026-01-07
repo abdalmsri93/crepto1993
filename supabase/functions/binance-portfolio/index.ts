@@ -30,54 +30,22 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    const userId = getUserIdFromAuthHeader(authHeader);
-
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader! } } }
-    );
-
-    console.log('Resolved user id from JWT:', userId);
-
-    // Get user's Binance API keys from profile
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('binance_api_key, binance_api_secret')
-      .eq('id', userId)
-      .single();
-
-    if (profileError || !profile) {
-      return new Response(
-        JSON.stringify({ error: 'Profile not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const apiKey = profile.binance_api_key;
-    const apiSecret = profile.binance_api_secret;
+    // Get API keys from request body instead of database
+    const body = await req.json();
+    const apiKey = body.apiKey;
+    const apiSecret = body.secretKey;
 
     if (!apiKey || !apiSecret) {
-      console.log('API Key exists:', !!apiKey);
-      console.log('API Secret exists:', !!apiSecret);
       return new Response(
         JSON.stringify({ 
-          error: 'Binance API keys not configured',
-          message: 'Please add your Binance API keys in Settings'
+          error: 'Binance API keys not provided',
+          message: 'Please provide apiKey and secretKey'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('API keys found. Key prefix:', apiKey.substring(0, 5) + '...');
+    console.log('API keys received. Key prefix:', apiKey.substring(0, 5) + '...');
 
     // Create signature for Binance API
     const timestamp = Date.now();
@@ -251,6 +219,7 @@ Deno.serve(async (req) => {
       
       console.log(`[${asset}] Result:`, result);
       return result;
+    });
 
     // Sort by USD value
     enrichedBalances.sort((a: any, b: any) => parseFloat(b.usdValue) - parseFloat(a.usdValue));

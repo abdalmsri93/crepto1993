@@ -22,30 +22,21 @@ const Settings = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate("/auth");
-        return;
+    // قراءة الإعدادات من localStorage مباشرة بدون Auth
+    const loadSettings = () => {
+      // قراءة Binance API Keys
+      const credentials = localStorage.getItem('binance_credentials');
+      if (credentials) {
+        try {
+          const parsed = JSON.parse(credentials);
+          setBinanceApiKey(parsed.apiKey || '');
+          setBinanceApiSecret(parsed.secretKey || '');
+        } catch (e) {
+          console.error('خطأ في قراءة المفاتيح:', e);
+        }
       }
 
-      setUser(session.user);
-
-      // Fetch user profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .single();
-
-      if (profile) {
-        setFullName(profile.full_name || "");
-        setBinanceApiKey(profile.binance_api_key || "");
-        setBinanceApiSecret(profile.binance_api_secret || "");
-      }
-
-      // Load Groq API Key from localStorage
+      // قراءة Groq API Key
       const savedGroqKey = localStorage.getItem('groq_api_key');
       if (savedGroqKey) {
         setGroqApiKey(savedGroqKey);
@@ -54,27 +45,23 @@ const Settings = () => {
       setIsFetching(false);
     };
 
-    checkAuth();
-  }, [navigate]);
+    loadSettings();
+  }, []);
 
   const handleSave = async () => {
-    if (!user) return;
-
     try {
       setIsLoading(true);
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: fullName.trim(),
-          binance_api_key: binanceApiKey.trim(),
-          binance_api_secret: binanceApiSecret.trim(),
-        })
-        .eq("id", user.id);
+      // حفظ Binance API Keys في localStorage
+      if (binanceApiKey.trim() && binanceApiSecret.trim()) {
+        const credentials = {
+          apiKey: binanceApiKey.trim(),
+          secretKey: binanceApiSecret.trim()
+        };
+        localStorage.setItem('binance_credentials', JSON.stringify(credentials));
+      }
 
-      if (error) throw error;
-
-      // Save Groq API Key to localStorage
+      // حفظ Groq API Key في localStorage
       if (groqApiKey.trim()) {
         localStorage.setItem('groq_api_key', groqApiKey.trim());
       } else {
@@ -82,12 +69,12 @@ const Settings = () => {
       }
 
       toast({
-        title: "تم الحفظ بنجاح",
-        description: "تم تحديث معلوماتك",
+        title: "✅ تم الحفظ بنجاح",
+        description: "تم تحديث معلوماتك في localStorage",
       });
     } catch (error: any) {
       toast({
-        title: "خطأ",
+        title: "❌ خطأ",
         description: error.message,
         variant: "destructive",
       });
@@ -97,8 +84,13 @@ const Settings = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/auth");
+    // مسح localStorage
+    localStorage.clear();
+    toast({
+      title: "تم تسجيل الخروج",
+      description: "تم مسح جميع البيانات المحلية",
+    });
+    navigate("/");
   };
 
   const testGroqAPI = async () => {

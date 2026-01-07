@@ -36,93 +36,79 @@ const Dashboard = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      if (!currentSession) {
-        navigate("/auth");
-        return;
-      }
-      
-      setSession(currentSession);
-      fetchPortfolio();
-    };
-
-    checkAuth();
-  }, [navigate]);
+    // تحميل المحفظة مباشرة بدون Auth
+    fetchPortfolio();
+  }, []);
 
   const fetchPortfolio = async () => {
     try {
       setIsLoading(true);
+      console.log('🔄 [Dashboard] بدء تحميل المحفظة...');
       
-      // محاولة جلب بيانات حقيقية من Binance API
-      const { data: { user } } = await supabase.auth.getUser();
+      // قراءة المفاتيح من localStorage
+      const stored = localStorage.getItem('binance_credentials');
+      console.log('🔍 [Dashboard] المفاتيح في localStorage:', stored ? 'موجودة ✅' : 'غير موجودة ❌');
       
-      if (!user) {
-        throw new Error('No user found');
+      if (!stored) {
+        console.log('⚠️ [Dashboard] لا توجد مفاتيح محفوظة');
+        toast({
+          title: "⚠️ لا توجد مفاتيح API",
+          description: "اذهب إلى الإعدادات لإدخال مفاتيح Binance",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
       }
+      
+      const credentials = JSON.parse(stored);
+      console.log('✅ [Dashboard] تم قراءة المفاتيح بنجاح');
 
-      // جلب بيانات المحفظة من Supabase
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('binance_api_key, binance_api_secret')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profile?.binance_api_key) {
-        throw new Error('No Binance API configured');
-      }
-
-      // جلب البيانات من API حقيقي (استخدام endpoint محلي أو CoinGecko)
-      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,binancecoin,ripple,cardano,solana,polkadot,dogecoin&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_last_updated_at=true');
+      // استدعاء Supabase Function لجلب البيانات الحقيقية
+      console.log('📤 [Dashboard] استدعاء Binance API...');
+      const response = await fetch('https://dpxuacnrncwyopehwxsj.supabase.co/functions/v1/binance-portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: credentials.apiKey,
+          secretKey: credentials.secretKey
+        })
+      });
+      
+      console.log('📥 [Dashboard] استجابة API:', response.status);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch from CoinGecko');
+        const errorData = await response.json();
+        console.error('❌ [Dashboard] خطأ في الاستجابة:', errorData);
+        throw new Error(errorData.error || `خطأ ${response.status}`);
       }
 
-      const coinsData = await response.json();
-
-      // إنشاء بيانات محفظة من localStorage أو بيانات افتراضية
-      const savedPortfolio = localStorage.getItem('binance_portfolio_assets');
-      let balances: Balance[] = [];
-
-      if (savedPortfolio) {
-        try {
-          const assets = JSON.parse(savedPortfolio);
-          // استخدام البيانات المحفوظة من localStorage
-          balances = assets.map((asset: string) => ({
-            asset,
-            free: '0',
-            locked: '0',
-            total: Math.random().toFixed(8),
-            usdValue: (Math.random() * 10000).toFixed(2),
-            priceChangePercent: ((Math.random() - 0.5) * 10).toFixed(2),
-            currentPrice: (Math.random() * 50000).toFixed(2),
-          }));
-        } catch (e) {
-          console.log('No saved assets');
-        }
+      const portfolioData = await response.json();
+      console.log('📊 [Dashboard] البيانات المستلمة:', portfolioData);
+      
+      if (portfolioData.error) {
+        throw new Error(portfolioData.error);
       }
 
-      // إذا لم نجد بيانات، استخدم بيانات افتراضية من CoinGecko
-      if (balances.length === 0) {
-        const coinSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'ADA', 'SOL', 'DOT', 'DOGE'];
-        balances = coinSymbols.map(symbol => ({
-          asset: symbol,
-          free: '0',
-          locked: '0',
-          total: (Math.random() * 100).toFixed(8),
-          usdValue: (Math.random() * 50000).toFixed(2),
-          priceChangePercent: ((Math.random() - 0.5) * 20).toFixed(2),
-          currentPrice: (Math.random() * 100000).toFixed(2),
-        }));
-      }
+      // تنسيق البيانات
+      let balances: Balance[] = portfolioData.balances.map((coin: any) => ({
+        asset: coin.asset,
+        free: coin.free,
+        locked: coin.locked || '0',
+        total: coin.free,
+        usdValue: coin.usdValue || '0',
+        priceChangePercent: '0',
+        currentPrice: '0',
+        dayPnL: '0',
+      }));
 
-      const totalValue = balances.reduce((sum, b) => sum + parseFloat(b.usdValue), 0);
-      const totalDayPnL = balances.reduce((sum, b) => sum + (parseFloat(b.usdValue) * (parseFloat(b.priceChangePercent) / 100)), 0);
-      const dayPnLPercent = totalValue > 0 ? ((totalDayPnL / totalValue) * 100).toFixed(2) : '0';
+      console.log('💰 [Dashboard] عدد العملات:', balances.length);
 
-      const portfolioData: PortfolioData = {
+      // حساب الإجماليات
+      const totalValue = parseFloat(portfolioData.totalValue || '0');
+      const totalDayPnL = 0;
+      const dayPnLPercent = '0';
+
+      const finalPortfolioData: PortfolioData = {
         balances,
         totalValue: totalValue.toFixed(2),
         totalDayPnL: totalDayPnL.toFixed(2),
@@ -130,47 +116,52 @@ const Dashboard = () => {
         lastUpdate: new Date().toISOString(),
       };
 
-      setPortfolio(portfolioData);
-    } catch (error) {
-      console.error('Error fetching portfolio:', error);
-      
-      // استخدم بيانات تجريبية في حالة الخطأ
-      const fallbackData: PortfolioData = {
-        balances: [
-          { asset: 'BTC', free: '0', locked: '0', total: '0.5', usdValue: '21500', priceChangePercent: '2.5' },
-          { asset: 'ETH', free: '0', locked: '0', total: '5', usdValue: '12500', priceChangePercent: '-1.2' },
-          { asset: 'BNB', free: '0', locked: '0', total: '10', usdValue: '3500', priceChangePercent: '0.8' },
-        ],
-        totalValue: '37500',
-        totalDayPnL: '450',
-        dayPnLPercent: '1.22',
-        lastUpdate: new Date().toISOString(),
-      };
-      setPortfolio(fallbackData);
+      console.log('✅ [Dashboard] تم تعيين البيانات بنجاح');
+      setPortfolio(finalPortfolioData);
       
       toast({
-        title: "تحذير",
-        description: "تم استخدام بيانات تجريبية",
+        title: "✅ تم التحديث",
+        description: `تم جلب ${balances.length} عملة بنجاح`,
+      });
+    } catch (error: any) {
+      console.error('❌ [Dashboard] خطأ في جلب المحفظة:', error);
+      
+      toast({
+        title: "❌ خطأ في جلب البيانات",
+        description: error.message || 'تعذر الاتصال بـ Binance',
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
+      console.log('🏁 [Dashboard] انتهى تحميل المحفظة');
     }
   };
 
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (isLoading || !portfolio) {
+  // عرض شاشة التحميل
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
           <p className="text-foreground/70">جاري تحميل لوحة التحكم...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // عرض رسالة إذا لم تكن هناك مفاتيح
+  if (!portfolio) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">⚠️ لا توجد مفاتيح API</h2>
+          <p className="text-muted-foreground mb-6">يرجى إضافة مفاتيح Binance API من الإعدادات</p>
+          <NavLink to="/settings">
+            <Button className="gap-2">
+              <SettingsIcon className="w-4 h-4" />
+              اذهب للإعدادات
+            </Button>
+          </NavLink>
         </div>
       </div>
     );

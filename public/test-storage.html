@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>اختبار حفظ المفاتيح</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #fff;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #fff;
+            border-radius: 5px;
+        }
+        button {
+            padding: 15px 30px;
+            background: #f0b90b;
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        button:hover { background: #ffd000; }
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #333;
+            overflow-x: auto;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff3333; }
+    </style>
+</head>
+<body>
+    <h1>🔧 اختبار حفظ المفاتيح في localStorage</h1>
+    
+    <div>
+        <h3>أدخل المفاتيح:</h3>
+        <input type="text" id="apiKey" placeholder="API Key">
+        <input type="password" id="secretKey" placeholder="Secret Key">
+        <button onclick="saveKeys()">💾 حفظ المفاتيح</button>
+        <button onclick="loadKeys()">📖 قراءة المفاتيح</button>
+        <button onclick="clearAll()">🗑️ حذف الكل</button>
+    </div>
+    
+    <h3>النتيجة:</h3>
+    <pre id="result">انتظار...</pre>
+
+    <script>
+        function saveKeys() {
+            const apiKey = document.getElementById('apiKey').value;
+            const secretKey = document.getElementById('secretKey').value;
+            const result = document.getElementById('result');
+            
+            if (!apiKey || !secretKey) {
+                result.innerHTML = '<span class="error">❌ يرجى إدخال المفاتيح!</span>';
+                return;
+            }
+            
+            try {
+                // الطريقة 1: حفظ ككائن واحد (الطريقة الجديدة)
+                const credentials = { apiKey, secretKey };
+                localStorage.setItem('binance_credentials', JSON.stringify(credentials));
+                
+                result.innerHTML = `<span class="success">✅ تم الحفظ بنجاح!</span>
+
+<strong>المحفوظ:</strong>
+API Key: ${apiKey.substring(0, 10)}...
+Secret Key: ${secretKey.substring(0, 10)}...
+
+<strong>في localStorage:</strong>
+binance_credentials = ${localStorage.getItem('binance_credentials')}
+
+<span class="success">✅ الآن اضغط "قراءة المفاتيح" للتأكد</span>`;
+            } catch (e) {
+                result.innerHTML = `<span class="error">❌ خطأ في الحفظ: ${e.message}</span>`;
+            }
+        }
+        
+        function loadKeys() {
+            const result = document.getElementById('result');
+            const stored = localStorage.getItem('binance_credentials');
+            
+            if (!stored) {
+                result.innerHTML = '<span class="error">❌ لا توجد مفاتيح محفوظة!</span>';
+                return;
+            }
+            
+            try {
+                const credentials = JSON.parse(stored);
+                result.innerHTML = `<span class="success">✅ المفاتيح موجودة!</span>
+
+<strong>API Key:</strong> ${credentials.apiKey?.substring(0, 10)}...
+<strong>Secret Key:</strong> ${credentials.secretKey?.substring(0, 10)}...
+
+<strong>JSON الكامل:</strong>
+${JSON.stringify(credentials, null, 2)}
+
+<strong>جميع مفاتيح localStorage:</strong>
+${Object.keys(localStorage).join(', ')}`;
+                
+                // إعادة ملء الحقول
+                if (credentials.apiKey) {
+                    document.getElementById('apiKey').value = credentials.apiKey;
+                }
+                if (credentials.secretKey) {
+                    document.getElementById('secretKey').value = credentials.secretKey;
+                }
+            } catch (e) {
+                result.innerHTML = `<span class="error">❌ خطأ في القراءة: ${e.message}</span>
+
+المحفوظ: ${stored}`;
+            }
+        }
+        
+        function clearAll() {
+            localStorage.removeItem('binance_credentials');
+            document.getElementById('apiKey').value = '';
+            document.getElementById('secretKey').value = '';
+            document.getElementById('result').innerHTML = '<span class="success">✅ تم حذف المفاتيح</span>';
+        }
+        
+        // تحميل تلقائي عند فتح الصفحة
+        window.onload = () => {
+            loadKeys();
+        };
+    </script>
+</body>
+</html>
