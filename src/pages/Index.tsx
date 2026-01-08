@@ -40,56 +40,47 @@ const Index = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check auth and set up listener
-    const checkAuth = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      if (!currentSession) {
-        navigate("/auth");
-        return;
-      }
-      
-      setSession(currentSession);
-    };
-
-    checkAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (!session) {
-        navigate("/auth");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    // تحميل المحفظة مباشرة بدون Auth
+    fetchPortfolio();
+  }, []);
 
   const fetchPortfolio = async () => {
-    if (!session) {
-      setIsLoading(false);
-      return;
-    }
     
     try {
       setIsLoading(true);
       console.log('Fetching portfolio data...');
       
-      const { data, error } = await supabase.functions.invoke('binance-portfolio', {
-        body: {},
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+      // قراءة المفاتيح من localStorage
+      const stored = localStorage.getItem('binance_credentials');
+      if (!stored) {
+        console.log('⚠️ لا توجد مفاتيح API');
+        setConnectionStatus('disconnected');
+        setPortfolio({ balances: [], totalValue: '0', lastUpdate: new Date().toISOString() });
+        setIsLoading(false);
+        return;
+      }
+      
+      const credentials = JSON.parse(stored);
+      
+      const response = await fetch('https://dpxuacnrncwyopehwxsj.supabase.co/functions/v1/binance-portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: credentials.apiKey,
+          secretKey: credentials.secretKey
+        })
       });
 
-      if (error) {
-        console.error('Error fetching portfolio:', error);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error fetching portfolio:', errorData);
         setConnectionStatus('disconnected');
-        // لا نرمي الخطأ - نسمح بعرض الواجهة الفارغة
         setPortfolio({ balances: [], totalValue: '0', lastUpdate: new Date().toISOString() });
         setIsLoading(false);
         return;
       }
 
+      const data = await response.json();
       console.log('Portfolio data received:', data);
       
       // حفظ عملات المحفظة في localStorage للفلترة التلقائية للمفضلات
@@ -165,35 +156,39 @@ const Index = () => {
   };
 
   const testConnection = async () => {
-    if (!session) return;
-    
     try {
       setConnectionStatus('testing');
       console.log('Testing Binance connection...');
       
-      const { data, error } = await supabase.functions.invoke('binance-portfolio', {
-        body: {},
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+      const stored = localStorage.getItem('binance_credentials');
+      if (!stored) {
+        setConnectionStatus('disconnected');
+        toast({
+          title: "فشل الاتصال",
+          description: "مفاتيح Binance API غير موجودة. يرجى إضافتها في الإعدادات.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const credentials = JSON.parse(stored);
+      
+      const response = await fetch('https://dpxuacnrncwyopehwxsj.supabase.co/functions/v1/binance-portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: credentials.apiKey,
+          secretKey: credentials.secretKey
+        })
       });
 
-      if (error) {
+      if (!response.ok) {
         setConnectionStatus('disconnected');
-        
-        if (error.message?.includes('not configured')) {
-          toast({
-            title: "فشل الاتصال",
-            description: "مفاتيح Binance API غير موجودة. يرجى إضافتها في الإعدادات.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "فشل الاتصال",
-            description: "تحقق من صحة مفاتيح API في الإعدادات",
-            variant: "destructive",
-          });
-        }
+        toast({
+          title: "فشل الاتصال",
+          description: "تحقق من صحة مفاتيح API في الإعدادات",
+          variant: "destructive",
+        });
         return;
       }
 

@@ -30,22 +30,44 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get API keys from request body instead of database
-    const body = await req.json();
-    const apiKey = body.apiKey;
-    const apiSecret = body.secretKey;
+    // Get API keys from request body
+    let body;
+    let apiKey;
+    let apiSecret;
+    
+    try {
+      const rawBody = await req.text();
+      console.log('📥 Raw request body:', rawBody);
+      
+      body = JSON.parse(rawBody);
+      console.log('📦 Parsed body:', JSON.stringify(body));
+      
+      apiKey = body?.apiKey || body?.api_key;
+      apiSecret = body?.secretKey || body?.secret_key || body?.apiSecret;
+      
+      console.log('🔑 Extracted - API Key present:', !!apiKey, 'Secret present:', !!apiSecret);
+    } catch (e) {
+      console.error('❌ Failed to parse request:', e);
+      return new Response(
+        JSON.stringify({ error: 'Invalid request format', details: e.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('🔑 Final check - API Key:', !!apiKey, 'Secret:', !!apiSecret);
 
     if (!apiKey || !apiSecret) {
+      console.error('❌ Missing keys. Body:', JSON.stringify(body));
       return new Response(
         JSON.stringify({ 
-          error: 'Binance API keys not provided',
-          message: 'Please provide apiKey and secretKey'
+          error: 'API Key and Secret Key are required in request body',
+          received: { hasApiKey: !!apiKey, hasSecretKey: !!apiSecret, body }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('API keys received. Key prefix:', apiKey.substring(0, 5) + '...');
+    console.log('✅ API keys received. Key prefix:', apiKey.substring(0, 5) + '...');
 
     // Create signature for Binance API
     const timestamp = Date.now();

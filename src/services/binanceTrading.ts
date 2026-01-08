@@ -149,17 +149,23 @@ export async function getAccountBalance(): Promise<AccountBalance[]> {
   }
 
   console.log('✅ [getAccountBalance] المفاتيح موجودة');
+  console.log('🔑 [getAccountBalance] API Key length:', credentials.apiKey?.length);
+  console.log('🔑 [getAccountBalance] Secret Key length:', credentials.secretKey?.length);
+  console.log('🔑 [getAccountBalance] API Key prefix:', credentials.apiKey?.substring(0, 8) + '...');
 
   try {
     console.log('📤 [getAccountBalance] استدعاء دالة binance-portfolio...');
     
+    const requestBody = { 
+      apiKey: credentials.apiKey, 
+      secretKey: credentials.secretKey 
+    };
+    console.log('📦 [getAccountBalance] Request body:', JSON.stringify(requestBody));
+    
     const response = await fetch('https://dpxuacnrncwyopehwxsj.supabase.co/functions/v1/binance-portfolio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        apiKey: credentials.apiKey, 
-        secretKey: credentials.secretKey 
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
