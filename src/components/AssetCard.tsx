@@ -68,13 +68,15 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     if (savedInv) {
       setSavedInvestment(parseFloat(savedInv));
     } else {
-      // 💰 للعملات القديمة: إذا كانت قيمتها > $3 ولا يوجد استثمار محفوظ، نضع $5 افتراضياً
+      // 💰 للعملات القديمة: إذا كانت قيمتها > $3 ولا يوجد استثمار محفوظ
+      // نجلب المبلغ من إعدادات الشراء التلقائي
       const currentValue = parseFloat(usdValue);
       if (currentValue > 3 && asset !== 'USDT') {
-        const defaultInvestment = 5;
+        const autoBuyAmount = localStorage.getItem('binance_auto_buy_amount');
+        const defaultInvestment = autoBuyAmount ? parseFloat(autoBuyAmount) : 5;
         setSavedInvestment(defaultInvestment);
         localStorage.setItem(`investment_${asset}`, defaultInvestment.toString());
-        console.log(`💰 تم تعيين استثمار افتراضي $${defaultInvestment} للعملة ${asset}`);
+        console.log(`💰 تم تعيين استثمار $${defaultInvestment} للعملة ${asset}`);
       }
     }
   }, [asset, usdValue]);
