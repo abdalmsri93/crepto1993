@@ -327,6 +327,11 @@ export function useFavorites() {
       
       if (result.success) {
         console.log(`✅ تم شراء ${result.executedQty} من ${symbol} بسعر ${result.avgPrice}`);
+        
+        // 💰 حفظ مبلغ الاستثمار في localStorage
+        const assetName = symbol.replace('USDT', '');
+        localStorage.setItem(`investment_${assetName}`, amount.toString());
+        console.log(`💰 تم حفظ مبلغ الاستثمار $${amount} للعملة ${assetName}`);
       } else {
         console.error(`❌ فشل شراء ${symbol}:`, result.error);
       }
