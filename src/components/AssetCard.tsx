@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { TrendingUp, ExternalLink, Calendar, Tag, Loader2, Plus, DollarSign, Wallet, ChevronDown, ChevronUp } from "lucide-react";
 import { useCoinMetadata } from "@/hooks/useCoinMetadata";
 import { getAutoSellSettings, sellAsset, hasCredentials } from "@/services/binanceTrading";
+import { addSellRecord } from "@/services/tradeHistory";
 import { useToast } from "@/hooks/use-toast";
 
 interface AssetCardProps {
@@ -122,11 +123,27 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
       // تنفيذ البيع
       sellAsset(asset).then(result => {
         setIsSelling(false);
+        const soldAmount = parseFloat(result.executedQty || '0');
+        const soldTotal = parseFloat(result.cummulativeQuoteQty || '0');
+        const profit = soldTotal - savedInvestment;
+        
         if (result.success) {
           toast({
             title: `✅ تم بيع ${asset} بنجاح!`,
-            description: `تم تحويل ${result.executedQty} إلى ${result.cummulativeQuoteQty} USDT`,
+            description: `تم تحويل ${result.executedQty} إلى ${result.cummulativeQuoteQty} USDT (ربح: $${profit.toFixed(2)})`,
           });
+          
+          // 📜 حفظ في سجل العمليات
+          addSellRecord(
+            asset,
+            soldAmount,
+            soldTotal / soldAmount, // السعر
+            soldTotal,
+            profit,
+            profitPercent,
+            true
+          );
+          
           // مسح مبلغ الاستثمار بعد البيع
           localStorage.removeItem(`investment_${asset}`);
           setSavedInvestment(0);
@@ -136,6 +153,19 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
             description: result.error,
             variant: "destructive",
           });
+          
+          // 📜 حفظ العملية الفاشلة في السجل
+          addSellRecord(
+            asset,
+            0,
+            0,
+            0,
+            0,
+            0,
+            false,
+            result.error
+          );
+          
           autoSellTriggeredRef.current = false; // السماح بإعادة المحاولة
         }
       });

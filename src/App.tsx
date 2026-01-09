@@ -15,6 +15,7 @@ import RecommendationTracking from "./pages/RecommendationTracking";
 import PortfolioRebalance from "./pages/PortfolioRebalance";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import Favorites from "./pages/Favorites";
+import TradeHistory from "./pages/TradeHistory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/confirm-email" element={<ConfirmEmail />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/trade-history" element={<TradeHistory />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

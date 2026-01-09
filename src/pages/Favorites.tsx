@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Heart, ArrowRight, Trophy, Star, Trash2, ShoppingCart, DollarSign, Settings, CheckCircle2, XCircle, Loader2, AlertTriangle, Zap, TrendingUp } from "lucide-react";
+import { Heart, ArrowRight, Trophy, Star, Trash2, ShoppingCart, DollarSign, Settings, CheckCircle2, XCircle, Loader2, AlertTriangle, Zap, TrendingUp, History } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CoinLaunchDate } from "@/components/CoinLaunchDate";
 import { CoinProject } from "@/components/CoinProject";
@@ -140,6 +140,16 @@ const Favorites = () => {
           <p className="text-muted-foreground">
             {count} عملة محفوظة
           </p>
+          {/* زر سجل العمليات */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/trade-history')}
+            className="gap-2 mt-2"
+          >
+            <History className="w-4 h-4" />
+            سجل العمليات
+          </Button>
         </div>
 
         {/* 🛒 بطاقة الشراء التلقائي */}

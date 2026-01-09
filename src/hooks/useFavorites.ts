@@ -7,6 +7,7 @@ import {
   hasCredentials,
   AutoBuySettings 
 } from '@/services/binanceTrading';
+import { addBuyRecord } from '@/services/tradeHistory';
 
 const FAVORITES_KEY = 'binance_watch_favorites';
 
@@ -332,8 +333,27 @@ export function useFavorites() {
         const assetName = symbol.replace('USDT', '');
         localStorage.setItem(`investment_${assetName}`, amount.toString());
         console.log(`💰 تم حفظ مبلغ الاستثمار $${amount} للعملة ${assetName}`);
+        
+        // 📜 حفظ في سجل العمليات
+        addBuyRecord(
+          assetName,
+          parseFloat(result.executedQty || '0'),
+          parseFloat(result.avgPrice || '0'),
+          amount,
+          true
+        );
       } else {
         console.error(`❌ فشل شراء ${symbol}:`, result.error);
+        
+        // 📜 حفظ العملية الفاشلة في السجل
+        addBuyRecord(
+          symbol.replace('USDT', ''),
+          0,
+          0,
+          amount,
+          false,
+          result.error
+        );
       }
       
       return autoBuyResult;
