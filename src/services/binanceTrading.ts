@@ -286,8 +286,34 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
 // Trading Functions
 // ==============================
 
+// Supabase URL
+const SUPABASE_URL = 'https://dpxuacnrncwyopehwxsj.supabase.co';
+
 /**
- * تحويل USDT إلى عملة معينة باستخدام Binance Convert (أبسط وأسهل من Market Order)
+ * إنشاء توقيع HMAC-SHA256 للمتصفح
+ */
+async function createSignature(queryString: string, secretKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secretKey);
+  const messageData = encoder.encode(queryString);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, messageData);
+  
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * تحويل USDT إلى عملة معينة باستخدام Market Order مباشرة
  */
 export async function buyWithAmount(
   symbol: string, 
@@ -299,48 +325,58 @@ export async function buyWithAmount(
   }
 
   try {
-    // إزالة USDT من السمبول إذا كان موجوداً (Convert API يحتاج فقط BTC وليس BTCUSDT)
-    const cleanSymbol = symbol.toUpperCase().replace('USDT', '');
+    // تحضير الرمز
+    const tradingSymbol = symbol.toUpperCase().endsWith('USDT') 
+      ? symbol.toUpperCase() 
+      : `${symbol.toUpperCase().replace('USDT', '')}USDT`;
     
-    console.log(`💱 محاولة تحويل $${usdtAmount} USDT إلى ${cleanSymbol}`);
+    console.log(`💱 محاولة شراء $${usdtAmount} من ${tradingSymbol}`);
 
-    // تنفيذ التحويل عبر Supabase Function
-    const convertParams = {
-      apiKey: credentials.apiKey,
-      secretKey: credentials.secretKey,
-      fromAsset: 'USDT',
-      toAsset: cleanSymbol,
-      fromAmount: usdtAmount,
-    };
+    // التحقق من الحد الأدنى
+    if (usdtAmount < 5) {
+      return { 
+        success: false, 
+        error: `الحد الأدنى للشراء هو $5` 
+      };
+    }
 
-    console.log('📤 إرسال طلب تحويل عبر Supabase:', convertParams);
+    console.log('📤 إرسال أمر الشراء إلى Binance...');
 
-    const { data, error } = await supabase.functions.invoke('binance-convert', {
-      body: convertParams,
+    // إرسال الطلب مباشرة للـ Edge Function
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/binance-convert`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        apiKey: credentials.apiKey,
+        secretKey: credentials.secretKey,
+        fromAsset: 'USDT',
+        toAsset: tradingSymbol.replace('USDT', ''),
+        fromAmount: usdtAmount,
+      }),
     });
 
-    if (error) {
-      console.error('❌ خطأ من Supabase Function:', error);
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      console.error('❌ خطأ من Binance:', data);
       return {
         success: false,
-        error: error.message || 'فشل تنفيذ التحويل',
+        error: data?.error || data?.msg || 'فشل تنفيذ الشراء',
+        errorCode: data?.code,
       };
     }
 
-    if (!data || !data.success) {
-      console.error('❌ فشل التحويل:', data);
-      return {
-        success: false,
-        error: data?.error || 'فشل تنفيذ التحويل',
-      };
-    }
+    console.log('✅ نتيجة الشراء:', data);
 
-    console.log('✅ نتيجة التحويل:', data);
+    // تحضير اسم الرمز للحفظ
+    const cleanSymbol = tradingSymbol.replace('USDT', '');
 
     // حفظ الصفقة في السجل
     saveTradeToHistory({
       orderId: data.orderId || String(Date.now()),
-      symbol: `${cleanSymbol}USDT`,
+      symbol: tradingSymbol,
       side: 'BUY',
       executedQty: data.toAmount || '0',
       cummulativeQuoteQty: String(usdtAmount),
@@ -352,7 +388,7 @@ export async function buyWithAmount(
     return {
       success: true,
       orderId: data.orderId,
-      symbol: `${cleanSymbol}USDT`,
+      symbol: tradingSymbol,
       side: 'BUY',
       executedQty: data.toAmount,
       cummulativeQuoteQty: String(usdtAmount),

@@ -250,6 +250,8 @@ export function useFavorites() {
 
   // إضافة إلى المفضلات - قراءة من localStorage مباشرة لتجنب مشاكل الـ state
   const addFavorite = (coin: SearchCoin) => {
+    console.log(`🔄 [addFavorite] بدء إضافة ${coin.symbol} للمفضلات...`);
+    
     // قراءة المفضلات الحالية من localStorage مباشرة
     const saved = localStorage.getItem(FAVORITES_KEY);
     let currentFavorites: SearchCoin[] = [];
@@ -274,9 +276,19 @@ export function useFavorites() {
       
       // 🚀 الشراء التلقائي إذا كان مفعلاً
       const autoBuySettings = getAutoBuySettings();
-      if (autoBuySettings.enabled && hasCredentials()) {
+      const hasKeys = hasCredentials();
+      
+      console.log(`📊 [addFavorite] إعدادات الشراء التلقائي:`, {
+        enabled: autoBuySettings.enabled,
+        amount: autoBuySettings.amount,
+        hasApiKeys: hasKeys,
+      });
+      
+      if (autoBuySettings.enabled && hasKeys) {
         console.log(`🛒 الشراء التلقائي مفعل - شراء $${autoBuySettings.amount} من ${coin.symbol}`);
         executeAutoBuy(coin.symbol, autoBuySettings.amount);
+      } else {
+        console.log(`⚠️ [addFavorite] الشراء التلقائي غير مفعل أو لا توجد مفاتيح API`);
       }
     } else {
       console.log(`⏭️ ${coin.symbol} موجودة مسبقاً في localStorage`);
