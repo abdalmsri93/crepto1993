@@ -1,7 +1,24 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SearchCoin } from '@/utils/advancedSearch';
+import { 
+  getAutoBuySettings, 
+  saveAutoBuySettings, 
+  buyWithAmount, 
+  hasCredentials,
+  AutoBuySettings 
+} from '@/services/binanceTrading';
 
 const FAVORITES_KEY = 'binance_watch_favorites';
+
+// نتيجة الشراء التلقائي
+export interface AutoBuyResult {
+  success: boolean;
+  symbol: string;
+  amount: number;
+  executedQty?: string;
+  avgPrice?: string;
+  error?: string;
+}
 
 // دالة حساب نقاط الترتيب للعملة
 export function calculateFavoriteScore(coin: SearchCoin): number {
@@ -84,6 +101,11 @@ export function useFavorites() {
   const [favorites, setFavorites] = useState<SearchCoin[]>([]);
   const [favoriteSymbols, setFavoriteSymbols] = useState<Set<string>>(new Set());
   const [portfolioSymbols, setPortfolioSymbols] = useState<Set<string>>(new Set());
+  
+  // 🛒 حالة الشراء التلقائي
+  const [autoBuySettings, setAutoBuySettingsState] = useState<AutoBuySettings>(getAutoBuySettings);
+  const [isAutoBuying, setIsAutoBuying] = useState(false);
+  const [lastAutoBuyResult, setLastAutoBuyResult] = useState<AutoBuyResult | null>(null);
 
   // العملات المفضلة الافتراضية (لاستعادة المفضلات المحذوفة)
   const defaultFavorites: SearchCoin[] = [
@@ -249,8 +271,59 @@ export function useFavorites() {
       localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
       setFavorites(updated);
       setFavoriteSymbols(new Set(updated.map(c => c.symbol)));
+      
+      // 🚀 الشراء التلقائي إذا كان مفعلاً
+      const autoBuySettings = getAutoBuySettings();
+      if (autoBuySettings.enabled && hasCredentials()) {
+        console.log(`🛒 الشراء التلقائي مفعل - شراء $${autoBuySettings.amount} من ${coin.symbol}`);
+        executeAutoBuy(coin.symbol, autoBuySettings.amount);
+      }
     } else {
       console.log(`⏭️ ${coin.symbol} موجودة مسبقاً في localStorage`);
+    }
+  };
+
+  // 🛒 تنفيذ الشراء التلقائي
+  const executeAutoBuy = async (symbol: string, amount: number): Promise<AutoBuyResult> => {
+    console.log(`🛒 بدء الشراء التلقائي: ${symbol} بمبلغ $${amount}`);
+    setLastAutoBuyResult(null);
+    setIsAutoBuying(true);
+    
+    try {
+      const result = await buyWithAmount(symbol, amount);
+      
+      const autoBuyResult: AutoBuyResult = {
+        success: result.success,
+        symbol: symbol,
+        amount: amount,
+        executedQty: result.executedQty,
+        avgPrice: result.avgPrice,
+        error: result.error,
+      };
+      
+      setLastAutoBuyResult(autoBuyResult);
+      setIsAutoBuying(false);
+      
+      if (result.success) {
+        console.log(`✅ تم شراء ${result.executedQty} من ${symbol} بسعر ${result.avgPrice}`);
+      } else {
+        console.error(`❌ فشل شراء ${symbol}:`, result.error);
+      }
+      
+      return autoBuyResult;
+    } catch (error: any) {
+      const autoBuyResult: AutoBuyResult = {
+        success: false,
+        symbol: symbol,
+        amount: amount,
+        error: error.message || 'خطأ غير متوقع',
+      };
+      
+      setLastAutoBuyResult(autoBuyResult);
+      setIsAutoBuying(false);
+      console.error(`❌ خطأ في الشراء التلقائي:`, error);
+      
+      return autoBuyResult;
     }
   };
 
@@ -278,6 +351,12 @@ export function useFavorites() {
     }
   };
 
+  // 🛒 تحديث إعدادات الشراء التلقائي
+  const updateAutoBuySettings = useCallback((settings: Partial<AutoBuySettings>) => {
+    saveAutoBuySettings(settings);
+    setAutoBuySettingsState(prev => ({ ...prev, ...settings }));
+  }, []);
+
   // المفضلات مرتبة من الأفضل للأسوأ
   const sortedFavorites = useMemo(() => {
     return [...favorites]
@@ -298,6 +377,12 @@ export function useFavorites() {
     toggleFavorite,
     count: favorites.length,
     calculateFavoriteScore,
-    getRankBadge
+    getRankBadge,
+    // 🛒 الشراء التلقائي
+    autoBuySettings,
+    updateAutoBuySettings,
+    isAutoBuying,
+    lastAutoBuyResult,
+    isAutoBuyReady: hasCredentials() && autoBuySettings.enabled,
   };
 }
