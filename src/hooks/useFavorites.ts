@@ -101,6 +101,7 @@ export function useFavorites() {
   const [favorites, setFavorites] = useState<SearchCoin[]>([]);
   const [favoriteSymbols, setFavoriteSymbols] = useState<Set<string>>(new Set());
   const [portfolioSymbols, setPortfolioSymbols] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
   
   // 🛒 حالة الشراء التلقائي
   const [autoBuySettings, setAutoBuySettingsState] = useState<AutoBuySettings>(getAutoBuySettings);
@@ -238,6 +239,7 @@ export function useFavorites() {
       setFavorites(cleanedFavorites);
       setFavoriteSymbols(new Set(cleanedFavorites.map(coin => coin.symbol)));
       localStorage.setItem(FAVORITES_KEY, JSON.stringify(cleanedFavorites));
+      setIsLoading(false);
       console.log(`📋 المجموع: ${cleanedFavorites.length} عملة في المفضلات`);
     };
 
@@ -286,9 +288,16 @@ export function useFavorites() {
       
       if (autoBuySettings.enabled && hasKeys) {
         console.log(`🛒 الشراء التلقائي مفعل - شراء $${autoBuySettings.amount} من ${coin.symbol}`);
-        executeAutoBuy(coin.symbol, autoBuySettings.amount);
+        // تنفيذ الشراء فوراً
+        executeAutoBuy(coin.symbol, autoBuySettings.amount).then(result => {
+          console.log(`📦 نتيجة الشراء التلقائي:`, result);
+        }).catch(err => {
+          console.error(`❌ خطأ في الشراء:`, err);
+        });
       } else {
         console.log(`⚠️ [addFavorite] الشراء التلقائي غير مفعل أو لا توجد مفاتيح API`);
+        console.log(`   - enabled: ${autoBuySettings.enabled}`);
+        console.log(`   - hasApiKeys: ${hasKeys}`);
       }
     } else {
       console.log(`⏭️ ${coin.symbol} موجودة مسبقاً في localStorage`);
@@ -388,6 +397,7 @@ export function useFavorites() {
     isFavorite,
     toggleFavorite,
     count: favorites.length,
+    isLoading,
     calculateFavoriteScore,
     getRankBadge,
     // 🛒 الشراء التلقائي

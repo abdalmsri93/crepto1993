@@ -4,14 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Heart, ArrowRight, Trophy, Star, Trash2, ShoppingCart, DollarSign, Settings, CheckCircle2, XCircle, Loader2, AlertTriangle, Zap, PlayCircle } from "lucide-react";
+import { Heart, ArrowRight, Trophy, Star, Trash2, ShoppingCart, DollarSign, Settings, CheckCircle2, XCircle, Loader2, AlertTriangle, Zap } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CoinLaunchDate } from "@/components/CoinLaunchDate";
 import { CoinProject } from "@/components/CoinProject";
 import { CoinCategory } from "@/components/CoinCategory";
 import { getCoinLaunchDateISO } from "@/hooks/useCoinMetadata";
-import { hasCredentials, buyWithAmount } from "@/services/binanceTrading";
+import { hasCredentials } from "@/services/binanceTrading";
 import { useToast } from "@/hooks/use-toast";
 
 const Favorites = () => {
@@ -34,14 +33,6 @@ const Favorites = () => {
   const [showAutoBuySettings, setShowAutoBuySettings] = useState(false);
   const [tempAmount, setTempAmount] = useState(String(autoBuySettings.amount));
   const hasApiKeys = hasCredentials();
-  
-  // حالة شراء العملات الموجودة
-  const [isBuyingAll, setIsBuyingAll] = useState(false);
-  const [buyAllProgress, setBuyAllProgress] = useState<{current: number; total: number; results: Array<{symbol: string; success: boolean; error?: string}>}>({
-    current: 0,
-    total: 0,
-    results: []
-  });
 
   // عرض إشعار عند نتيجة الشراء التلقائي
   useEffect(() => {
@@ -95,99 +86,8 @@ const Favorites = () => {
     }
   };
 
-  // 🛒 شراء جميع العملات الموجودة في المفضلة
-  const buyAllFavorites = async () => {
-    if (!hasApiKeys) {
-      toast({
-        title: "⚠️ مطلوب إعداد API",
-        description: "يجب إعداد مفاتيح Binance API أولاً",
-        variant: "destructive",
-      });
-      navigate('/trading-settings');
-      return;
-    }
-
-    if (favorites.length === 0) {
-      toast({
-        title: "⚠️ لا توجد عملات",
-        description: "أضف عملات للمفضلة أولاً",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const amount = autoBuySettings.amount;
-    const totalCost = amount * favorites.length;
-
-    // تأكيد الشراء
-    const confirmed = window.confirm(
-      `🛒 تأكيد شراء ${favorites.length} عملة\n\n` +
-      `المبلغ لكل عملة: $${amount}\n` +
-      `المجموع الكلي: $${totalCost}\n\n` +
-      `هل تريد المتابعة؟`
-    );
-
-    if (!confirmed) return;
-
-    setIsBuyingAll(true);
-    setBuyAllProgress({ current: 0, total: favorites.length, results: [] });
-
-    const results: Array<{symbol: string; success: boolean; error?: string}> = [];
-
-    for (let i = 0; i < favorites.length; i++) {
-      const coin = favorites[i];
-      setBuyAllProgress(prev => ({ ...prev, current: i + 1 }));
-
-      try {
-        console.log(`🛒 شراء ${i + 1}/${favorites.length}: ${coin.symbol}`);
-        const result = await buyWithAmount(coin.symbol, amount);
-        
-        results.push({
-          symbol: coin.symbol,
-          success: result.success,
-          error: result.error
-        });
-
-        if (result.success) {
-          toast({
-            title: `✅ ${coin.symbol}`,
-            description: `تم شراء ${result.executedQty} بسعر ${result.avgPrice}`,
-          });
-        } else {
-          toast({
-            title: `❌ ${coin.symbol}`,
-            description: result.error || "فشل الشراء",
-            variant: "destructive",
-          });
-        }
-
-        // انتظار قليل بين كل عملية
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error: any) {
-        results.push({
-          symbol: coin.symbol,
-          success: false,
-          error: error.message
-        });
-      }
-
-      setBuyAllProgress(prev => ({ ...prev, results }));
-    }
-
-    setIsBuyingAll(false);
-
-    // ملخص النتائج
-    const successCount = results.filter(r => r.success).length;
-    const failCount = results.filter(r => !r.success).length;
-
-    toast({
-      title: "📊 ملخص الشراء",
-      description: `نجح: ${successCount} | فشل: ${failCount} | المجموع: ${results.length}`,
-    });
-  };
-
-  // تفعيل/إيقاف الشراء التلقائي مع شراء الموجود
-  const handleToggleAutoBuy = async (enabled: boolean) => {
+  // تفعيل/إيقاف الشراء التلقائي
+  const handleToggleAutoBuy = (enabled: boolean) => {
     if (enabled && !hasApiKeys) {
       toast({
         title: "⚠️ مطلوب إعداد API",
@@ -200,28 +100,10 @@ const Favorites = () => {
 
     updateAutoBuySettings({ enabled });
 
-    if (enabled && favorites.length > 0) {
-      // سؤال المستخدم إذا يريد شراء العملات الموجودة
-      const buyExisting = window.confirm(
-        `🛒 تم تفعيل الشراء التلقائي!\n\n` +
-        `لديك ${favorites.length} عملة في المفضلة.\n` +
-        `هل تريد شراءها الآن أيضاً؟\n\n` +
-        `المبلغ لكل عملة: $${autoBuySettings.amount}\n` +
-        `المجموع: $${autoBuySettings.amount * favorites.length}`
-      );
-
-      if (buyExisting) {
-        await buyAllFavorites();
-      } else {
-        toast({
-          title: "🛒 تم التفعيل",
-          description: `سيتم شراء $${autoBuySettings.amount} تلقائياً عند إضافة عملة جديدة`,
-        });
-      }
-    } else if (enabled) {
+    if (enabled) {
       toast({
         title: "🛒 تم التفعيل",
-        description: `سيتم شراء $${autoBuySettings.amount} تلقائياً عند إضافة عملة`,
+        description: `سيتم شراء $${autoBuySettings.amount} تلقائياً عند إضافة عملة جديدة`,
       });
     } else {
       toast({
@@ -399,56 +281,6 @@ const Favorites = () => {
                     </Button>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* 🛒 شريط تقدم شراء الكل */}
-            {isBuyingAll && (
-              <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-                    <span className="text-blue-500 font-semibold">جاري شراء العملات...</span>
-                  </div>
-                  <span className="text-blue-500">
-                    {buyAllProgress.current} / {buyAllProgress.total}
-                  </span>
-                </div>
-                <div className="w-full bg-blue-500/20 rounded-full h-2">
-                  <div 
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(buyAllProgress.current / buyAllProgress.total) * 100}%` }}
-                  />
-                </div>
-                {buyAllProgress.results.length > 0 && (
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    {buyAllProgress.results.map((r, i) => (
-                      <span 
-                        key={i}
-                        className={`px-2 py-1 rounded ${r.success ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}
-                      >
-                        {r.success ? '✅' : '❌'} {r.symbol.replace('USDT', '')}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* زر شراء جميع العملات الموجودة */}
-            {count > 0 && hasApiKeys && !isBuyingAll && (
-              <div className="flex justify-center">
-                <Button
-                  onClick={buyAllFavorites}
-                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 gap-2"
-                  size="lg"
-                >
-                  <PlayCircle className="w-5 h-5" />
-                  شراء جميع العملات ({count})
-                  <span className="bg-white/20 px-2 py-0.5 rounded text-sm">
-                    ${autoBuySettings.amount * count}
-                  </span>
-                </Button>
               </div>
             )}
           </CardContent>
