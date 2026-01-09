@@ -42,6 +42,15 @@ const Index = () => {
   useEffect(() => {
     // تحميل المحفظة مباشرة بدون Auth
     fetchPortfolio();
+    console.log('🚀 بدء التحديث التلقائي - كل 30 ثانية');
+    
+    // تحديث تلقائي كل 30 ثانية
+    const interval = setInterval(() => {
+      console.log('🔄 تحديث تلقائي...', new Date().toLocaleTimeString());
+      fetchPortfolio();
+    }, 30000); // 30000 ms = 30 ثانية
+    
+    return () => clearInterval(interval);
   }, []);
 
   const fetchPortfolio = async () => {
@@ -207,19 +216,6 @@ const Index = () => {
       });
     }
   };
-
-  useEffect(() => {
-    if (session) {
-      fetchPortfolio();
-      
-      // تحديث تلقائي كل 30 ثانية
-      const interval = setInterval(() => {
-        fetchPortfolio();
-      }, 30000); // 30000 ms = 30 ثانية
-      
-      return () => clearInterval(interval);
-    }
-  }, [session]);
 
   if (isLoading && !portfolio) {
     return (

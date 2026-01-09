@@ -62,6 +62,7 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   // 🔄 حالة البيع التلقائي
   const [isSelling, setIsSelling] = useState<boolean>(false);
   const autoSellTriggeredRef = useRef<boolean>(false);
+  const [checkCounter, setCheckCounter] = useState<number>(0); // لإجبار الفحص الدوري
   
   // تحميل مبلغ التعزيز المحفوظ عند التحميل
   useEffect(() => {
@@ -88,6 +89,15 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     }
   }, [asset, usdValue]);
   
+  // ⏰ فحص دوري كل 30 ثانية لضمان عمل البيع التلقائي
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCheckCounter(prev => prev + 1);
+    }, 30000); // كل 30 ثانية
+    
+    return () => clearInterval(interval);
+  }, []);
+  
   // 🔄 البيع التلقائي عند وصول الربح للنسبة المطلوبة
   useEffect(() => {
     if (asset === 'USDT' || savedInvestment <= 0 || autoSellTriggeredRef.current || isSelling) return;
@@ -97,6 +107,9 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     
     const currentValue = parseFloat(usdValue);
     const profitPercent = ((currentValue - savedInvestment) / savedInvestment) * 100;
+    
+    // طباعة حالة الفحص للتتبع
+    console.log(`🔍 فحص ${asset}: القيمة $${currentValue.toFixed(2)} | الاستثمار $${savedInvestment} | الربح ${profitPercent.toFixed(2)}% | المطلوب ${autoSellSettings.profitPercent}%`);
     
     // التحقق من وصول الربح للنسبة المطلوبة
     if (profitPercent >= autoSellSettings.profitPercent) {
@@ -127,7 +140,7 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
         }
       });
     }
-  }, [asset, usdValue, savedInvestment, isSelling, toast]);
+  }, [asset, usdValue, savedInvestment, isSelling, toast, checkCounter]);
   
   // إضافة مبلغ تعزيز جديد
   const handleAddBoost = (e: React.MouseEvent) => {
@@ -190,7 +203,15 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                 alt={asset}
                 className="w-8 h-8 relative z-10 group-hover:drop-shadow-[0_0_12px_rgba(255,215,0,0.6)]"
                 onError={(e) => {
-                  e.currentTarget.src = "https://via.placeholder.com/32/FFD700/000000?text=" + asset;
+                  // إخفاء الصورة عند الخطأ وإظهار الحرف الأول بدلاً منها
+                  e.currentTarget.style.display = 'none';
+                  const parent = e.currentTarget.parentElement;
+                  if (parent && !parent.querySelector('.fallback-icon')) {
+                    const fallback = document.createElement('div');
+                    fallback.className = 'fallback-icon w-8 h-8 rounded-full bg-gradient-to-r from-crypto-gold to-crypto-green flex items-center justify-center text-black font-bold text-sm';
+                    fallback.textContent = asset.charAt(0);
+                    parent.appendChild(fallback);
+                  }
                 }}
               />
             </div>
