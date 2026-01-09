@@ -67,8 +67,17 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     const savedInv = localStorage.getItem(`investment_${asset}`);
     if (savedInv) {
       setSavedInvestment(parseFloat(savedInv));
+    } else {
+      // 💰 للعملات القديمة: إذا كانت قيمتها > $3 ولا يوجد استثمار محفوظ، نضع $5 افتراضياً
+      const currentValue = parseFloat(usdValue);
+      if (currentValue > 3 && asset !== 'USDT') {
+        const defaultInvestment = 5;
+        setSavedInvestment(defaultInvestment);
+        localStorage.setItem(`investment_${asset}`, defaultInvestment.toString());
+        console.log(`💰 تم تعيين استثمار افتراضي $${defaultInvestment} للعملة ${asset}`);
+      }
     }
-  }, [asset]);
+  }, [asset, usdValue]);
   
   // إضافة مبلغ تعزيز جديد
   const handleAddBoost = (e: React.MouseEvent) => {
