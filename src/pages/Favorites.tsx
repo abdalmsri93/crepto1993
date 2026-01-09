@@ -4,13 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Heart, ArrowRight, Trophy, Star, Trash2, ShoppingCart, DollarSign, Settings, CheckCircle2, XCircle, Loader2, AlertTriangle, Zap } from "lucide-react";
+import { Heart, ArrowRight, Trophy, Star, Trash2, ShoppingCart, DollarSign, Settings, CheckCircle2, XCircle, Loader2, AlertTriangle, Zap, TrendingUp } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CoinLaunchDate } from "@/components/CoinLaunchDate";
 import { CoinProject } from "@/components/CoinProject";
 import { CoinCategory } from "@/components/CoinCategory";
 import { getCoinLaunchDateISO } from "@/hooks/useCoinMetadata";
-import { hasCredentials } from "@/services/binanceTrading";
+import { hasCredentials, getAutoSellSettings, saveAutoSellSettings } from "@/services/binanceTrading";
 import { useToast } from "@/hooks/use-toast";
 
 const Favorites = () => {
@@ -33,6 +33,10 @@ const Favorites = () => {
   const [showAutoBuySettings, setShowAutoBuySettings] = useState(false);
   const [tempAmount, setTempAmount] = useState(String(autoBuySettings.amount));
   const hasApiKeys = hasCredentials();
+  
+  // 📈 حالة إعدادات البيع التلقائي
+  const [autoSellSettings, setAutoSellSettings] = useState(getAutoSellSettings);
+  const [tempProfitPercent, setTempProfitPercent] = useState(String(autoSellSettings.profitPercent));
 
   // عرض إشعار عند نتيجة الشراء التلقائي
   useEffect(() => {
@@ -283,6 +287,127 @@ const Favorites = () => {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* 📈 بطاقة البيع التلقائي عند الربح */}
+        <Card className={`border-2 transition-all ${autoSellSettings.enabled ? 'border-purple-500/50 bg-purple-500/5' : 'border-primary/20 bg-card/50'} backdrop-blur`}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <TrendingUp className={`w-5 h-5 ${autoSellSettings.enabled ? 'text-purple-500' : 'text-muted-foreground'}`} />
+                البيع التلقائي عند الربح
+                {autoSellSettings.enabled && (
+                  <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+                    مفعل
+                  </span>
+                )}
+              </CardTitle>
+              <Switch
+                checked={autoSellSettings.enabled}
+                onCheckedChange={(enabled) => {
+                  if (enabled && !hasApiKeys) {
+                    toast({
+                      title: "⚠️ مطلوب إعداد API",
+                      description: "يجب إعداد مفاتيح Binance API أولاً",
+                      variant: "destructive",
+                    });
+                    navigate('/trading-settings');
+                    return;
+                  }
+                  saveAutoSellSettings({ enabled });
+                  setAutoSellSettings(prev => ({ ...prev, enabled }));
+                  toast({
+                    title: enabled ? "📈 تم التفعيل" : "⏸️ تم الإيقاف",
+                    description: enabled 
+                      ? `سيتم بيع العملات تلقائياً عند وصول الربح إلى ${autoSellSettings.profitPercent}%`
+                      : "تم إيقاف البيع التلقائي",
+                  });
+                }}
+              />
+            </div>
+          </CardHeader>
+          
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                {autoSellSettings.enabled ? (
+                  <>
+                    <TrendingUp className="w-4 h-4 text-purple-500" />
+                    <span className="text-purple-500">سيتم البيع عند وصول الربح للنسبة المحددة</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                    <span className="text-muted-foreground">البيع التلقائي معطل</span>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-1 text-purple-400 font-bold">
+                <TrendingUp className="w-4 h-4" />
+                {autoSellSettings.profitPercent}%
+              </div>
+            </div>
+
+            {/* إعدادات نسبة الربح */}
+            <div className="p-4 bg-muted/30 rounded-lg space-y-4 border border-primary/10">
+              <h4 className="font-semibold flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-purple-400" />
+                نسبة الربح للبيع
+              </h4>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={tempProfitPercent}
+                  onChange={(e) => setTempProfitPercent(e.target.value)}
+                  className="flex-1"
+                  placeholder="نسبة الربح %"
+                />
+                <Button 
+                  onClick={() => {
+                    const percent = parseFloat(tempProfitPercent);
+                    if (percent >= 1 && percent <= 100) {
+                      saveAutoSellSettings({ profitPercent: percent });
+                      setAutoSellSettings(prev => ({ ...prev, profitPercent: percent }));
+                      toast({
+                        title: "✅ تم الحفظ",
+                        description: `سيتم البيع عند وصول الربح إلى ${percent}%`,
+                      });
+                    } else {
+                      toast({
+                        title: "⚠️ خطأ",
+                        description: "النسبة يجب أن تكون بين 1% و 100%",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  className="bg-purple-500 hover:bg-purple-600"
+                >
+                  حفظ
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                مثال: إذا استثمرت $5 ونسبة الربح 10%، سيتم البيع عند وصول القيمة إلى $5.50
+              </p>
+              
+              {/* أزرار النسب السريعة */}
+              <div className="flex flex-wrap gap-2">
+                {[5, 10, 15, 20, 25, 50].map((percent) => (
+                  <Button
+                    key={percent}
+                    variant={parseFloat(tempProfitPercent) === percent ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTempProfitPercent(String(percent))}
+                    className={parseFloat(tempProfitPercent) === percent ? "bg-purple-500" : ""}
+                  >
+                    {percent}%
+                  </Button>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
 

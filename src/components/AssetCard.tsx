@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, ExternalLink, Calendar, Tag, Loader2, Plus, DollarSign, Wallet, ChevronDown, ChevronUp } from "lucide-react";
 import { useCoinMetadata } from "@/hooks/useCoinMetadata";
+import { getAutoSellSettings, sellAsset, hasCredentials } from "@/services/binanceTrading";
+import { useToast } from "@/hooks/use-toast";
 
 interface AssetCardProps {
   asset: string;
@@ -41,6 +43,7 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const percentage = priceChangePercent ? parseFloat(priceChangePercent) : 0;
   const isPositive = percentage >= 0;
   const logoUrl = COIN_LOGOS[asset] || "https://cryptologos.cc/logos/generic-crypto-logo.png";
+  const { toast } = useToast();
   
   // جلب بيانات العملة من الـ APIs
   const { launchDate, category, loading, error } = useCoinMetadata(asset);
@@ -55,6 +58,10 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   
   // 📂 حالة طي/توسيع البطاقة (مطوية بشكل افتراضي دائماً)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
+  
+  // 🔄 حالة البيع التلقائي
+  const [isSelling, setIsSelling] = useState<boolean>(false);
+  const autoSellTriggeredRef = useRef<boolean>(false);
   
   // تحميل مبلغ التعزيز المحفوظ عند التحميل
   useEffect(() => {
@@ -80,6 +87,47 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
       }
     }
   }, [asset, usdValue]);
+  
+  // 🔄 البيع التلقائي عند وصول الربح للنسبة المطلوبة
+  useEffect(() => {
+    if (asset === 'USDT' || savedInvestment <= 0 || autoSellTriggeredRef.current || isSelling) return;
+    
+    const autoSellSettings = getAutoSellSettings();
+    if (!autoSellSettings.enabled || !hasCredentials()) return;
+    
+    const currentValue = parseFloat(usdValue);
+    const profitPercent = ((currentValue - savedInvestment) / savedInvestment) * 100;
+    
+    // التحقق من وصول الربح للنسبة المطلوبة
+    if (profitPercent >= autoSellSettings.profitPercent) {
+      console.log(`🎯 ${asset} وصل للربح ${profitPercent.toFixed(2)}% (المطلوب: ${autoSellSettings.profitPercent}%)`);
+      
+      // منع التكرار
+      autoSellTriggeredRef.current = true;
+      setIsSelling(true);
+      
+      // تنفيذ البيع
+      sellAsset(asset).then(result => {
+        setIsSelling(false);
+        if (result.success) {
+          toast({
+            title: `✅ تم بيع ${asset} بنجاح!`,
+            description: `تم تحويل ${result.executedQty} إلى ${result.cummulativeQuoteQty} USDT`,
+          });
+          // مسح مبلغ الاستثمار بعد البيع
+          localStorage.removeItem(`investment_${asset}`);
+          setSavedInvestment(0);
+        } else {
+          toast({
+            title: `❌ فشل بيع ${asset}`,
+            description: result.error,
+            variant: "destructive",
+          });
+          autoSellTriggeredRef.current = false; // السماح بإعادة المحاولة
+        }
+      });
+    }
+  }, [asset, usdValue, savedInvestment, isSelling, toast]);
   
   // إضافة مبلغ تعزيز جديد
   const handleAddBoost = (e: React.MouseEvent) => {

@@ -59,6 +59,8 @@ const STORAGE_KEYS = {
   CREDENTIALS: 'binance_credentials',  // تخزين المفاتيح ككائن واحد
   AUTO_BUY_ENABLED: 'binance_auto_buy_enabled',
   AUTO_BUY_AMOUNT: 'binance_auto_buy_amount',
+  AUTO_SELL_ENABLED: 'binance_auto_sell_enabled',
+  AUTO_SELL_PROFIT_PERCENT: 'binance_auto_sell_profit_percent',
   TRADE_HISTORY: 'binance_trade_history',
   TESTNET_MODE: 'binance_testnet_mode',
 };
@@ -130,6 +132,86 @@ export function saveAutoBuySettings(settings: Partial<AutoBuySettings>): void {
     localStorage.setItem(STORAGE_KEYS.TESTNET_MODE, String(settings.testnetMode));
   }
   console.log('⚙️ تم حفظ إعدادات الشراء التلقائي:', settings);
+}
+
+// ==============================
+// Auto-Sell Settings (البيع التلقائي عند الربح)
+// ==============================
+
+export interface AutoSellSettings {
+  enabled: boolean;
+  profitPercent: number;   // نسبة الربح للبيع (مثل 10%)
+}
+
+export function getAutoSellSettings(): AutoSellSettings {
+  return {
+    enabled: localStorage.getItem(STORAGE_KEYS.AUTO_SELL_ENABLED) === 'true',
+    profitPercent: parseFloat(localStorage.getItem(STORAGE_KEYS.AUTO_SELL_PROFIT_PERCENT) || '10'),
+  };
+}
+
+export function saveAutoSellSettings(settings: Partial<AutoSellSettings>): void {
+  if (settings.enabled !== undefined) {
+    localStorage.setItem(STORAGE_KEYS.AUTO_SELL_ENABLED, String(settings.enabled));
+  }
+  if (settings.profitPercent !== undefined) {
+    localStorage.setItem(STORAGE_KEYS.AUTO_SELL_PROFIT_PERCENT, String(settings.profitPercent));
+  }
+  console.log('⚙️ تم حفظ إعدادات البيع التلقائي:', settings);
+}
+
+/**
+ * بيع عملة وتحويلها إلى USDT
+ */
+export async function sellAsset(asset: string, quantity?: number): Promise<TradeResult> {
+  const credentials = getCredentials();
+  if (!credentials) {
+    return { success: false, error: 'لم يتم إعداد مفاتيح API' };
+  }
+
+  try {
+    console.log(`💰 بيع ${asset}${quantity ? ` (كمية: ${quantity})` : ' (كل الرصيد)'}`);
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/binance-sell`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: credentials.apiKey,
+        secretKey: credentials.secretKey,
+        asset: asset,
+        quantity: quantity,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      console.error('❌ خطأ في البيع:', data);
+      return {
+        success: false,
+        error: data?.error || 'فشل تنفيذ البيع',
+      };
+    }
+
+    console.log('✅ تم البيع بنجاح:', data);
+    
+    return {
+      success: true,
+      orderId: data.orderId,
+      symbol: data.symbol,
+      side: 'SELL',
+      executedQty: data.executedQty,
+      cummulativeQuoteQty: data.receivedUsdt,
+      avgPrice: data.avgPrice,
+      status: data.status,
+    };
+  } catch (error: any) {
+    console.error('❌ خطأ في البيع:', error);
+    return {
+      success: false,
+      error: error.message || 'فشل تنفيذ البيع',
+    };
+  }
 }
 
 // ==============================
@@ -578,6 +660,8 @@ export default {
   // Settings
   getAutoBuySettings,
   saveAutoBuySettings,
+  getAutoSellSettings,
+  saveAutoSellSettings,
   
   // Account
   getAccountBalance,
@@ -588,6 +672,7 @@ export default {
   buyWithQuantity,
   executeAutoBuy,
   bulkBuy,
+  sellAsset,
   
   // Symbol Info
   getSymbolInfo,
