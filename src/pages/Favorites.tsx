@@ -140,17 +140,27 @@ const Favorites = () => {
           <p className="text-muted-foreground">
             {count} عملة محفوظة
           </p>
-          {/* زر سجل العمليات */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/trade-history')}
-            className="gap-2 mt-2"
-          >
-            <History className="w-4 h-4" />
-            سجل العمليات
-          </Button>
         </div>
+
+        {/* 📜 زر سجل العمليات */}
+        <Card className="border-2 border-blue-500/30 bg-blue-500/5 backdrop-blur">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <History className="w-6 h-6 text-blue-500" />
+              <div>
+                <p className="font-semibold">سجل العمليات</p>
+                <p className="text-xs text-muted-foreground">عرض جميع عمليات الشراء والبيع</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => navigate('/trade-history')}
+              className="bg-blue-500 hover:bg-blue-600 gap-2"
+            >
+              <History className="w-4 h-4" />
+              فتح السجل
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* 🛒 بطاقة الشراء التلقائي */}
         <Card className={`border-2 transition-all ${autoBuySettings.enabled ? 'border-green-500/50 bg-green-500/5' : 'border-primary/20 bg-card/50'} backdrop-blur`}>
