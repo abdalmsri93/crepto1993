@@ -96,6 +96,12 @@ const Index = () => {
       const data = await response.json();
       console.log('Portfolio data received:', data);
       
+      // 💾 حفظ بيانات المحفظة الكاملة في localStorage
+      if (data) {
+        localStorage.setItem('binance_portfolio_data', JSON.stringify(data));
+        console.log('💾 تم حفظ بيانات المحفظة');
+      }
+      
       // حفظ عملات المحفظة في localStorage للفلترة التلقائية للمفضلات
       if (data && data.balances && data.balances.length > 0) {
         const portfolioAssets = data.balances.map((b: any) => b.asset.toUpperCase());

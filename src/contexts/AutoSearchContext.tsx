@@ -17,6 +17,7 @@ import {
   getCurrentProfitPercent,
   saveSmartTradingState
 } from '@/services/smartTradingService';
+import { buyWithAmount, hasCredentials, getAutoBuySettings } from '@/services/binanceTrading';
 
 // 🔧 دالة لحساب معايير Binance تلقائياً (نفس البحث اليدوي)
 function calculateBinanceMetrics(ticker: any) {
@@ -123,6 +124,7 @@ function calculatePriceRange(usdtBalance: number): { min: number; max: number } 
 // دالة قراءة رصيد USDT
 function getUSDTBalance(): number {
   try {
+    // 1. أولاً: من بيانات المحفظة المحفوظة
     const portfolioData = localStorage.getItem('binance_portfolio_data');
     if (portfolioData) {
       const data = JSON.parse(portfolioData);
@@ -131,24 +133,43 @@ function getUSDTBalance(): number {
           b.asset?.toUpperCase() === 'USDT'
         );
         if (usdtAsset) {
-          return parseFloat(usdtAsset.free || usdtAsset.total || '0');
+          const balance = parseFloat(usdtAsset.free || usdtAsset.total || usdtAsset.usdValue || '0');
+          console.log('💰 رصيد USDT من portfolio_data:', balance);
+          if (balance > 0) return balance;
         }
       }
     }
 
+    // 2. من القيمة الإجمالية المحفوظة
     const totalValue = localStorage.getItem('binance_total_value');
     if (totalValue) {
-      return parseFloat(totalValue);
+      const balance = parseFloat(totalValue);
+      console.log('💰 رصيد USDT من total_value:', balance);
+      if (balance > 0) return balance;
     }
 
+    // 3. من بيانات الأصول المحفوظة (نبحث عن قيمة USDT)
     const savedAssets = localStorage.getItem('binance_portfolio_assets');
     if (savedAssets) {
-      const assets = JSON.parse(savedAssets);
-      if (assets.includes('USDT')) {
-        return 10;
+      try {
+        const assets = JSON.parse(savedAssets);
+        // البحث عن USDT في المصفوفة
+        const usdtData = assets.find((a: any) => 
+          (typeof a === 'string' && a === 'USDT') ||
+          (a?.asset === 'USDT') ||
+          (a?.symbol === 'USDT')
+        );
+        if (usdtData && typeof usdtData === 'object') {
+          const balance = parseFloat(usdtData.usdValue || usdtData.total || usdtData.free || '0');
+          if (balance > 0) return balance;
+        }
+      } catch (e) {
+        console.error('خطأ في قراءة الأصول:', e);
       }
     }
 
+    // 4. القيمة الافتراضية
+    console.log('⚠️ لم يتم العثور على رصيد USDT');
     return 0;
   } catch (error) {
     console.error('❌ خطأ في قراءة رصيد USDT:', error);
@@ -412,30 +433,22 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       if (smartSettings.enabled) {
         addLog('info', `🎯 نظام التداول الذكي مفعّل - الدورة ${smartState.currentCycle} - النسبة ${smartState.currentProfitPercent}%`);
         
-        // التحقق من الرصيد الكافي لـ 3 عملات
-        const requiredBalance = smartSettings.coinsPerCycle * smartSettings.buyAmount;
-        if (usdtBalance < requiredBalance) {
-          addLog('warning', `⛔ الرصيد غير كافي! متوفر: $${usdtBalance.toFixed(2)} - مطلوب: $${requiredBalance}`);
+        // التحقق من الرصيد الكافي لعملة واحدة على الأقل
+        if (usdtBalance < smartSettings.buyAmount) {
+          addLog('warning', `⛔ الرصيد غير كافي! متوفر: $${usdtBalance.toFixed(2)} - مطلوب: $${smartSettings.buyAmount}`);
           setStatus(prev => ({ ...prev, isSearching: false }));
           return;
         }
         
-        // التحقق من عدد العملات المعلقة
-        if (smartState.pendingCoins.length >= smartSettings.coinsPerCycle) {
-          addLog('warning', `⏳ يوجد ${smartState.pendingCoins.length} عملات قيد الانتظار - انتظر البيع`);
-          setStatus(prev => ({ ...prev, isSearching: false }));
-          return;
-        }
-        
-        // التحقق من المحفظة
+        // التحقق من المحفظة (الحد الأقصى 50 عملة)
         const portfolioCoins = getPortfolioCoinsCount();
         if (portfolioCoins >= smartSettings.maxPortfolioCoins) {
-          addLog('warning', `⛔ المحفظة ممتلئة! ${portfolioCoins}/${smartSettings.maxPortfolioCoins}`);
+          addLog('warning', `⛔ المحفظة ممتلئة! ${portfolioCoins}/${smartSettings.maxPortfolioCoins} - انتظر البيع`);
           setStatus(prev => ({ ...prev, isSearching: false }));
           return;
         }
         
-        addLog('success', `✅ جميع الشروط متوفرة - بدء البحث عن ${smartSettings.coinsPerCycle} عملات`);
+        addLog('success', `✅ الشروط متوفرة - المحفظة: ${portfolioCoins}/${smartSettings.maxPortfolioCoins} - الرصيد: $${usdtBalance.toFixed(2)}`);
       }
       
       if (usdtBalance < MIN_USDT_BALANCE) {
@@ -457,7 +470,7 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       }
       
       const selectedCoins = selectRandomCoins(allCoins, COINS_PER_SEARCH);
-      addLog('info', `📋 تم اختيار ${selectedCoins.length} عملة`);
+      addLog('info', `📋 تم اختيار ${selectedCoins.length} عملة للتحليل`);
       
       // التحقق من وجود API Key
       const hasApiKey = !!localStorage.getItem('groq_api_key');
@@ -468,18 +481,15 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       let addedInCycle = 0;
       let skippedInCycle = 0;
       
-      // 🎯 تحديد الحد الأقصى للإضافة (3 عملات في التداول الذكي)
-      // إعادة استخدام المتغيرات المحلية
-      const maxToAdd = smartSettings.enabled 
-        ? smartSettings.coinsPerCycle - smartState.pendingCoins.length 
-        : COINS_PER_SEARCH;
+      // 🎯 البحث المستمر - نضيف عملة واحدة كل دورة (حتى الوصول لـ 50)
+      const maxToAdd = 1; // عملة واحدة كل دورة بحث
       
       for (const coin of selectedCoins) {
         if (!isRunningRef.current) break;
         
-        // 🎯 التوقف إذا وصلنا للحد المطلوب
-        if (smartSettings.enabled && addedInCycle >= maxToAdd) {
-          addLog('success', `🎯 تم إضافة ${addedInCycle} عملات - الحد المطلوب`);
+        // 🎯 التوقف إذا أضفنا عملة في هذه الدورة
+        if (addedInCycle >= maxToAdd) {
+          addLog('success', `🎯 تم إضافة عملة - الانتقال للدورة التالية`);
           break;
         }
         
@@ -519,11 +529,35 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
               addedInCycle++;
               addLog('success', `⭐ تمت الإضافة للمفضلات`, coin.symbol);
               
-              // 🎯 تسجيل في نظام التداول الذكي
-              if (smartSettings.enabled) {
-                registerBuy(coin.symbol);
-                const currentProfitPercent = getCurrentProfitPercent();
-                addLog('info', `📈 نسبة البيع لهذه العملة: ${currentProfitPercent}%`, coin.symbol);
+              // 🎯 تنفيذ الشراء الفعلي
+              if (smartSettings.enabled && hasCredentials()) {
+                const buyAmount = smartSettings.buyAmount;
+                addLog('info', `💰 جاري شراء $${buyAmount} من ${coin.symbol}...`, coin.symbol);
+                
+                try {
+                  const buyResult = await buyWithAmount(coin.symbol, buyAmount);
+                  
+                  if (buyResult.success) {
+                    addLog('success', `✅ تم الشراء! الكمية: ${buyResult.executedQty}`, coin.symbol);
+                    
+                    // تسجيل في نظام التداول الذكي
+                    registerBuy(coin.symbol);
+                    const currentProfitPercent = getCurrentProfitPercent();
+                    addLog('info', `📈 نسبة البيع لهذه العملة: ${currentProfitPercent}%`, coin.symbol);
+                    
+                    // حفظ مبلغ الاستثمار للعملة
+                    localStorage.setItem(`investment_${coin.symbol}`, String(buyAmount));
+                  } else {
+                    addLog('error', `❌ فشل الشراء: ${buyResult.error}`, coin.symbol);
+                    // إزالة من المفضلات إذا فشل الشراء
+                    addedInCycle--;
+                  }
+                } catch (buyError: any) {
+                  addLog('error', `❌ خطأ في الشراء: ${buyError.message}`, coin.symbol);
+                  addedInCycle--;
+                }
+              } else if (!hasCredentials()) {
+                addLog('warning', `⚠️ لا يوجد API Keys - لم يتم الشراء`, coin.symbol);
               }
             } else {
               skippedInCycle++;

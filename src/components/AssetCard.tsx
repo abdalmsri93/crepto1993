@@ -9,7 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   getSmartTradingSettings, 
   registerSell, 
-  getCurrentProfitPercent 
+  getCurrentProfitPercent,
+  getCoinTargetProfit 
 } from "@/services/smartTradingService";
 
 interface AssetCardProps {
@@ -117,8 +118,9 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     const profitPercent = ((currentValue - savedInvestment) / savedInvestment) * 100;
     
     // 🎯 استخدام نسبة التداول الذكي إذا كان مفعّلاً، وإلا استخدام النسبة الثابتة
+    // getCoinTargetProfit تجلب النسبة المحفوظة وقت الشراء لهذه العملة
     const targetProfitPercent = smartTradingSettings.enabled 
-      ? getCurrentProfitPercent() 
+      ? getCoinTargetProfit(asset) 
       : autoSellSettings.profitPercent;
     
     // طباعة حالة الفحص للتتبع
@@ -160,18 +162,16 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
           if (smartTradingSettings.enabled) {
             const sellResult = registerSell(asset, profit);
             
-            if (sellResult.cycleCompleted) {
-              toast({
-                title: `🎉 اكتملت الدورة!`,
-                description: `النسبة الجديدة: ${sellResult.newProfitPercent}% - سيبدأ البحث عن عملات جديدة`,
-              });
-              
-              // 🔄 تفعيل البحث التلقائي لبدء دورة جديدة
-              // إرسال حدث مخصص لتفعيل البحث
-              window.dispatchEvent(new CustomEvent('smart-trading-cycle-complete', {
-                detail: { newProfitPercent: sellResult.newProfitPercent }
-              }));
-            }
+            toast({
+              title: `💰 تم البيع بنجاح!`,
+              description: `النسبة الجديدة للشراء التالي: ${sellResult.newProfitPercent}%`,
+            });
+            
+            // 🔄 تفعيل البحث التلقائي لبدء دورة جديدة
+            // إرسال حدث مخصص لتفعيل البحث
+            window.dispatchEvent(new CustomEvent('smart-trading-cycle-complete', {
+              detail: { newProfitPercent: sellResult.newProfitPercent }
+            }));
           }
           
           // مسح مبلغ الاستثمار بعد البيع

@@ -532,7 +532,7 @@ const Favorites = () => {
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Repeat className="w-4 h-4 text-orange-500" />
-              <span>كل دورة: {smartTradingSettings.coinsPerCycle} عملات • الحد الأقصى: {smartTradingSettings.maxPortfolioCoins} عملة</span>
+              <span>بعد كل عملية بيع تزداد النسبة 5% • الحد الأقصى: {smartTradingSettings.maxPortfolioCoins} عملة</span>
             </div>
 
             {/* إعدادات التداول الذكي */}
@@ -545,21 +545,6 @@ const Favorites = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm text-muted-foreground">عدد العملات لكل دورة</label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={smartTradingSettings.coinsPerCycle}
-                      onChange={(e) => {
-                        const value = parseInt(e.target.value) || 3;
-                        saveSmartTradingSettings({ coinsPerCycle: value });
-                        setSmartTradingSettings(prev => ({ ...prev, coinsPerCycle: value }));
-                      }}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
                     <label className="text-sm text-muted-foreground">الحد الأقصى للمحفظة</label>
                     <Input
                       type="number"
@@ -570,6 +555,21 @@ const Favorites = () => {
                         const value = parseInt(e.target.value) || 50;
                         saveSmartTradingSettings({ maxPortfolioCoins: value });
                         setSmartTradingSettings(prev => ({ ...prev, maxPortfolioCoins: value }));
+                      }}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">زيادة النسبة بعد كل بيع</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={smartTradingSettings.profitIncrement}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 5;
+                        saveSmartTradingSettings({ profitIncrement: value });
+                        setSmartTradingSettings(prev => ({ ...prev, profitIncrement: value }));
                       }}
                       className="mt-1"
                     />
@@ -619,7 +619,7 @@ const Favorites = () => {
                 )}
 
                 <p className="text-xs text-muted-foreground">
-                  💡 عند بيع 3 عملات، تزداد النسبة 5%، وعند 100% ترجع لـ 5%
+                  💡 بعد كل عملية بيع تزداد النسبة {smartTradingSettings.profitIncrement}%، وعند 100% ترجع لـ 5%
                 </p>
               </div>
             )}
