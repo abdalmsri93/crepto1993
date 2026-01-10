@@ -10,6 +10,8 @@ import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X, Play,
 import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/NavLink";
 import { useAutoSearch } from "@/contexts/AutoSearchContext";
+import { assignProfitPercentsToExistingCoins } from "@/services/smartTradingService";
+import { addBuyRecord, getTradeHistory } from "@/services/tradeHistory";
 import type { Session } from "@supabase/supabase-js";
 
 interface Balance {
@@ -107,6 +109,48 @@ const Index = () => {
         const portfolioAssets = data.balances.map((b: any) => b.asset.toUpperCase());
         localStorage.setItem('binance_portfolio_assets', JSON.stringify(portfolioAssets));
         console.log('📦 حفظ عملات المحفظة:', portfolioAssets);
+        
+        // 🎯 تعيين نسب البيع للعملات الموجودة تلقائياً
+        const coinsWithValue = data.balances
+          .filter((b: any) => b.asset !== 'USDT' && parseFloat(b.usdValue || '0') > 1)
+          .map((b: any) => b.asset);
+        if (coinsWithValue.length > 0) {
+          assignProfitPercentsToExistingCoins(coinsWithValue);
+        }
+        
+        // 📜 تسجيل العمليات السابقة في السجل (مرة واحدة)
+        const existingHistory = getTradeHistory();
+        const registeredAssets = new Set(existingHistory.map((t: any) => t.asset));
+        
+        for (const balance of data.balances) {
+          if (balance.asset === 'USDT') continue;
+          const usdValue = parseFloat(balance.usdValue || '0');
+          if (usdValue < 1) continue; // تخطي العملات بقيمة أقل من $1
+          
+          // التحقق إذا كانت مسجلة مسبقاً
+          if (registeredAssets.has(balance.asset)) continue;
+          
+          // جلب الاستثمار أو استخدام $5 كقيمة افتراضية
+          const investment = localStorage.getItem(`investment_${balance.asset}`);
+          const investmentAmount = investment ? parseFloat(investment) : 5;
+          
+          // إذا لم يكن الاستثمار محفوظاً، نحفظه
+          if (!investment) {
+            localStorage.setItem(`investment_${balance.asset}`, '5');
+          }
+          
+          const quantity = parseFloat(balance.total);
+          const price = quantity > 0 ? investmentAmount / quantity : 0;
+          
+          addBuyRecord(
+            balance.asset,
+            quantity,
+            price,
+            investmentAmount,
+            true
+          );
+          console.log(`📜 تم تسجيل ${balance.asset} في السجل - استثمار: $${investmentAmount}`);
+        }
         
         // حذف العملات من المفضلات إذا أصبحت في المحفظة
         const favoritesKey = 'binance_watch_favorites';

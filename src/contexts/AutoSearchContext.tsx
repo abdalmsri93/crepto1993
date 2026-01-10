@@ -18,6 +18,7 @@ import {
   saveSmartTradingState
 } from '@/services/smartTradingService';
 import { buyWithAmount, hasCredentials, getAutoBuySettings } from '@/services/binanceTrading';
+import { addBuyRecord } from '@/services/tradeHistory';
 
 // 🔧 دالة لحساب معايير Binance تلقائياً (نفس البحث اليدوي)
 function calculateBinanceMetrics(ticker: any) {
@@ -539,6 +540,15 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
                   
                   if (buyResult.success) {
                     addLog('success', `✅ تم الشراء! الكمية: ${buyResult.executedQty}`, coin.symbol);
+                    
+                    // 📜 تسجيل عملية الشراء في السجل
+                    addBuyRecord(
+                      coin.symbol,
+                      parseFloat(buyResult.executedQty || '0'),
+                      parseFloat(buyResult.avgPrice || '0'),
+                      buyAmount,
+                      true
+                    );
                     
                     // تسجيل في نظام التداول الذكي
                     registerBuy(coin.symbol);

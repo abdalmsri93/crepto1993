@@ -326,6 +326,28 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
             </div>
           )}
           
+          {/* 🎯 قسم نسبة البيع والهدف */}
+          {savedInvestment > 0 && asset !== 'USDT' && (
+            <div className="p-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/30">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-1.5 text-green-400 text-sm font-semibold">
+                  🎯 نسبة البيع
+                </div>
+                <span className="font-orbitron text-green-400 font-bold text-lg">
+                  {getCoinTargetProfit(asset)}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-semibold">
+                  💰 الهدف
+                </div>
+                <span className="font-orbitron text-emerald-400 font-bold text-lg">
+                  ${((savedInvestment + totalBoost) * (1 + getCoinTargetProfit(asset) / 100)).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
+          
           {/* التفاصيل القابلة للطي */}
           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100'}`}>
             <div className="space-y-3 pt-2">

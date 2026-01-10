@@ -215,9 +215,14 @@ export const saveCoinTargetProfit = (coinSymbol: string, profitPercent: number):
 /**
  * جلب نسبة البيع لعملة معينة
  */
-export const getCoinTargetProfit = (coinSymbol: string): number | null => {
+export const getCoinTargetProfit = (coinSymbol: string): number => {
   const saved = localStorage.getItem(`coin_target_profit_${coinSymbol}`);
-  return saved ? parseFloat(saved) : null;
+  if (saved) {
+    return parseFloat(saved);
+  }
+  // إذا لم تكن محفوظة، نرجع النسبة الافتراضية
+  const settings = getSmartTradingSettings();
+  return settings.startProfitPercent;
 };
 
 /**
@@ -225,6 +230,31 @@ export const getCoinTargetProfit = (coinSymbol: string): number | null => {
  */
 export const removeCoinTargetProfit = (coinSymbol: string): void => {
   localStorage.removeItem(`coin_target_profit_${coinSymbol}`);
+};
+
+/**
+ * تعيين نسب البيع للعملات الموجودة تلقائياً
+ * تُعيد تعيين النسب دائماً حسب الترتيب (5%, 10%, 15%...)
+ */
+export const assignProfitPercentsToExistingCoins = (coins: string[]): void => {
+  const settings = getSmartTradingSettings();
+  let currentPercent = settings.startProfitPercent; // 5%
+  
+  for (const coin of coins) {
+    // تعيين النسبة دائماً (إعادة تعيين)
+    saveCoinTargetProfit(coin, currentPercent);
+    console.log(`🎯 تعيين ${coin}: ${currentPercent}%`);
+    
+    // زيادة النسبة للعملة التالية
+    currentPercent += settings.profitIncrement;
+    if (currentPercent > settings.maxProfitPercent) {
+      currentPercent = settings.startProfitPercent;
+    }
+  }
+  
+  // تحديث النسبة الحالية في الحالة للعملة القادمة
+  saveSmartTradingState({ currentProfitPercent: currentPercent });
+  console.log(`📈 النسبة القادمة: ${currentPercent}%`);
 };
 
 /**
