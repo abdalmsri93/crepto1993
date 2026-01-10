@@ -16,7 +16,9 @@ import {
   getSmartTradingSettings, 
   saveSmartTradingSettings, 
   getSmartTradingSummary,
-  resetSmartTradingState
+  resetSmartTradingState,
+  syncPortfolioWithSmartTrading,
+  getPendingCoins
 } from "@/services/smartTradingService";
 
 const Favorites = () => {
@@ -574,7 +576,22 @@ const Favorites = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const result = syncPortfolioWithSmartTrading();
+                      setSmartTradingSummary(getSmartTradingSummary());
+                      toast({
+                        title: result.synced.length > 0 ? "🔄 تم المزامنة" : "ℹ️ لا توجد عملات",
+                        description: result.message,
+                      });
+                    }}
+                    className="text-blue-500 border-blue-500/50 hover:bg-blue-500/10"
+                  >
+                    🔄 مزامنة العملات
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -591,6 +608,15 @@ const Favorites = () => {
                     إعادة تعيين الدورات
                   </Button>
                 </div>
+
+                {/* عرض العملات المعلقة */}
+                {getPendingCoins().length > 0 && (
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <p className="text-xs text-purple-400">
+                      العملات قيد الانتظار: {getPendingCoins().join(', ')}
+                    </p>
+                  </div>
+                )}
 
                 <p className="text-xs text-muted-foreground">
                   💡 عند بيع 3 عملات، تزداد النسبة 5%، وعند 100% ترجع لـ 5%

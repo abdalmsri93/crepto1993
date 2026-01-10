@@ -25,7 +25,9 @@ import {
   TestTube,
   Wallet,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Download,
+  Upload
 } from 'lucide-react';
 import {
   saveCredentials,
@@ -197,6 +199,85 @@ const TradingSettings = () => {
     });
   };
 
+  // 📤 تصدير جميع الإعدادات
+  const handleExportSettings = () => {
+    const allSettings: Record<string, any> = {};
+    
+    // جمع كل الإعدادات من localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('binance_') || key.startsWith('smart_trading') || key.startsWith('auto_search') || key.startsWith('groq_'))) {
+        try {
+          const value = localStorage.getItem(key);
+          allSettings[key] = value;
+        } catch (e) {
+          console.error(`خطأ في قراءة ${key}:`, e);
+        }
+      }
+    }
+    
+    // إنشاء ملف JSON وتحميله
+    const dataStr = JSON.stringify(allSettings, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `binance-settings-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: '📤 تم التصدير',
+      description: `تم تصدير ${Object.keys(allSettings).length} إعداد`,
+    });
+  };
+
+  // 📥 استيراد الإعدادات
+  const handleImportSettings = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      try {
+        const text = await file.text();
+        const settings = JSON.parse(text);
+        
+        let importedCount = 0;
+        for (const [key, value] of Object.entries(settings)) {
+          if (typeof value === 'string') {
+            localStorage.setItem(key, value);
+            importedCount++;
+          }
+        }
+        
+        toast({
+          title: '📥 تم الاستيراد',
+          description: `تم استيراد ${importedCount} إعداد. سيتم تحديث الصفحة...`,
+        });
+        
+        // تحديث الصفحة بعد ثانية
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+        
+      } catch (error) {
+        toast({
+          title: '❌ خطأ',
+          description: 'فشل استيراد الإعدادات. تأكد من صحة الملف.',
+          variant: 'destructive',
+        });
+      }
+    };
+    
+    input.click();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95 p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -211,10 +292,20 @@ const TradingSettings = () => {
               ربط حسابك في Binance وتفعيل الشراء التلقائي
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate('/')} className="gap-2">
-            <ArrowRight className="w-4 h-4" />
-            العودة
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExportSettings} className="gap-2" title="تصدير الإعدادات">
+              <Download className="w-4 h-4" />
+              تصدير
+            </Button>
+            <Button variant="outline" onClick={handleImportSettings} className="gap-2" title="استيراد الإعدادات">
+              <Upload className="w-4 h-4" />
+              استيراد
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/')} className="gap-2">
+              <ArrowRight className="w-4 h-4" />
+              العودة
+            </Button>
+          </div>
         </div>
 
         {/* API Keys Card */}

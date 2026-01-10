@@ -6,9 +6,10 @@ import { AssetCard } from "@/components/AssetCard";
 import { PortfolioAnalysis } from "@/components/PortfolioAnalysis";
 import { AutoSearchPanel } from "@/components/AutoSearchPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X } from "lucide-react";
+import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/NavLink";
+import { useAutoSearch } from "@/contexts/AutoSearchContext";
 import type { Session } from "@supabase/supabase-js";
 
 interface Balance {
@@ -38,6 +39,9 @@ const Index = () => {
   const [showAutoSearch, setShowAutoSearch] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // 🔄 استخدام البحث التلقائي
+  const { isRunning, startAutoSearch, stopAutoSearch } = useAutoSearch();
 
   useEffect(() => {
     // تحميل المحفظة مباشرة بدون Auth
@@ -246,13 +250,46 @@ const Index = () => {
             </NavLink>
           </div>
           <div className="flex gap-2">
+            {/* زر تشغيل/إيقاف البحث التلقائي */}
+            <Button 
+              onClick={() => {
+                if (isRunning) {
+                  stopAutoSearch();
+                  toast({
+                    title: "🔴 تم الإيقاف",
+                    description: "تم إيقاف البحث التلقائي",
+                  });
+                } else {
+                  startAutoSearch();
+                  toast({
+                    title: "🟢 تم التشغيل",
+                    description: "البحث التلقائي يعمل الآن!",
+                  });
+                }
+              }}
+              variant={isRunning ? "destructive" : "default"}
+              className={`gap-2 transition-all duration-300 hover:scale-105 ${isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+            >
+              {isRunning ? (
+                <>
+                  <Square className="w-4 h-4" />
+                  إيقاف البحث
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" />
+                  تشغيل البحث ⚡
+                </>
+              )}
+            </Button>
+            {/* زر إظهار/إخفاء لوحة التحكم */}
             <Button 
               onClick={() => setShowAutoSearch(!showAutoSearch)}
-              variant={showAutoSearch ? "default" : "outline"}
-              className="gap-2 transition-all duration-300 hover:scale-105 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30 hover:border-green-500/50"
+              variant="outline"
+              className="gap-2 transition-all duration-300 hover:scale-105 border-primary/30 hover:border-primary/50"
             >
               <Zap className="w-4 h-4" />
-              {showAutoSearch ? 'إخفاء البحث التلقائي' : 'البحث التلقائي'}
+              {showAutoSearch ? 'إخفاء' : 'التفاصيل'}
             </Button>
             <NavLink to="/suggest-coins">
               <Button className="gap-2 transition-all duration-300 hover:scale-105">

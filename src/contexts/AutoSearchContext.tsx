@@ -787,6 +787,25 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
+  // 🚀 بدء البحث التلقائي تلقائياً إذا كان التداول الذكي مفعّل
+  useEffect(() => {
+    const smartSettings = getSmartTradingSettings();
+    const hasApiKeys = !!localStorage.getItem('binance_credentials');
+    
+    // إذا كان التداول الذكي مفعّل ومفاتيح API موجودة والبحث لم يبدأ بعد
+    if (smartSettings.enabled && hasApiKeys && !isRunningRef.current) {
+      console.log('🚀 بدء البحث التلقائي تلقائياً - التداول الذكي مفعّل');
+      addLog('info', '🚀 بدء البحث التلقائي تلقائياً - التداول الذكي مفعّل');
+      
+      // تأخير بسيط لضمان تحميل كل شيء
+      setTimeout(() => {
+        if (!isRunningRef.current) {
+          startAutoSearch();
+        }
+      }, 3000); // انتظار 3 ثواني
+    }
+  }, [startAutoSearch, addLog]);
+
   const value: AutoSearchContextType = {
     status,
     settings,

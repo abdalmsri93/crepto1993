@@ -328,3 +328,55 @@ export const getSmartTradingSummary = (): {
     nextProfitPercent,
   };
 };
+
+/**
+ * مزامنة العملات الموجودة في المحفظة مع نظام التداول الذكي
+ * يضيف العملات التي لها استثمار محفوظ إلى قائمة الانتظار
+ */
+export const syncPortfolioWithSmartTrading = (): {
+  synced: string[];
+  message: string;
+} => {
+  const settings = getSmartTradingSettings();
+  const state = getSmartTradingState();
+  const synced: string[] = [];
+  
+  // جلب كل العملات من localStorage التي لها استثمار محفوظ
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('investment_')) {
+      const symbol = key.replace('investment_', '');
+      const investment = parseFloat(localStorage.getItem(key) || '0');
+      
+      // إذا كان لها استثمار ولم تكن مسجلة
+      if (investment > 0 && !state.pendingCoins.includes(symbol)) {
+        synced.push(symbol);
+      }
+    }
+  }
+  
+  // إضافة العملات المتزامنة (حتى الحد الأقصى للدورة)
+  const maxToSync = Math.min(synced.length, settings.coinsPerCycle - state.pendingCoins.length);
+  const toAdd = synced.slice(0, maxToSync);
+  
+  if (toAdd.length > 0) {
+    const newPendingCoins = [...state.pendingCoins, ...toAdd];
+    saveSmartTradingState({ pendingCoins: newPendingCoins });
+    console.log(`🔄 تم مزامنة ${toAdd.length} عملة:`, toAdd);
+  }
+  
+  return {
+    synced: toAdd,
+    message: toAdd.length > 0 
+      ? `تم مزامنة ${toAdd.length} عملة: ${toAdd.join(', ')}`
+      : 'لا توجد عملات جديدة للمزامنة',
+  };
+};
+
+/**
+ * الحصول على قائمة العملات المعلقة
+ */
+export const getPendingCoins = (): string[] => {
+  const state = getSmartTradingState();
+  return state.pendingCoins;
+};
