@@ -3,7 +3,7 @@ import { Sparkles, Zap } from "lucide-react";
 import { useAutoSearch } from "@/contexts/AutoSearchContext";
 
 // 📦 رقم الإصدار الحالي
-export const APP_VERSION = "4.7.1";
+export const APP_VERSION = "5.0.0";
 
 export const VersionBadge = () => {
   const { isRunning, isSearching, status } = useAutoSearch();
