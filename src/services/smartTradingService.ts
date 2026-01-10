@@ -1,0 +1,330 @@
+/**
+ * 🎯 خدمة التداول الذكي - نظام النسب المتصاعدة
+ * 
+ * الميزات:
+ * - نسب ربح متصاعدة (5% → 10% → 15% ... → 100% → 5%)
+ * - حد أقصى للمحفظة (50 عملة)
+ * - دورات من 3 عملات
+ * - التحقق من الرصيد قبل الشراء
+ */
+
+// مفاتيح التخزين
+const SMART_TRADING_KEY = 'smart_trading_settings';
+const SMART_TRADING_STATE_KEY = 'smart_trading_state';
+
+// الإعدادات الافتراضية
+export interface SmartTradingSettings {
+  enabled: boolean;
+  coinsPerCycle: number;      // عدد العملات لكل دورة (افتراضي: 3)
+  maxPortfolioCoins: number;  // الحد الأقصى للمحفظة (افتراضي: 50)
+  buyAmount: number;          // مبلغ الشراء لكل عملة (افتراضي: $5)
+  startProfitPercent: number; // نسبة البداية (افتراضي: 5%)
+  profitIncrement: number;    // زيادة النسبة (افتراضي: 5%)
+  maxProfitPercent: number;   // أقصى نسبة (افتراضي: 100%)
+}
+
+// حالة النظام
+export interface SmartTradingState {
+  currentCycle: number;           // رقم الدورة الحالية
+  currentProfitPercent: number;   // النسبة الحالية
+  soldInCurrentCycle: number;     // عدد المباعة في الدورة الحالية
+  totalCyclesCompleted: number;   // إجمالي الدورات المكتملة
+  totalProfit: number;            // إجمالي الربح
+  lastUpdated: string;            // آخر تحديث
+  pendingCoins: string[];         // العملات قيد الانتظار
+}
+
+// الإعدادات الافتراضية
+const DEFAULT_SETTINGS: SmartTradingSettings = {
+  enabled: false,
+  coinsPerCycle: 3,
+  maxPortfolioCoins: 50,
+  buyAmount: 5,
+  startProfitPercent: 5,
+  profitIncrement: 5,
+  maxProfitPercent: 100,
+};
+
+// الحالة الافتراضية
+const DEFAULT_STATE: SmartTradingState = {
+  currentCycle: 1,
+  currentProfitPercent: 5,
+  soldInCurrentCycle: 0,
+  totalCyclesCompleted: 0,
+  totalProfit: 0,
+  lastUpdated: new Date().toISOString(),
+  pendingCoins: [],
+};
+
+// ================= دوال الإعدادات =================
+
+export const getSmartTradingSettings = (): SmartTradingSettings => {
+  try {
+    const stored = localStorage.getItem(SMART_TRADING_KEY);
+    if (stored) {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+    }
+  } catch (error) {
+    console.error('خطأ في قراءة إعدادات التداول الذكي:', error);
+  }
+  return DEFAULT_SETTINGS;
+};
+
+export const saveSmartTradingSettings = (settings: Partial<SmartTradingSettings>): void => {
+  try {
+    const current = getSmartTradingSettings();
+    const updated = { ...current, ...settings };
+    localStorage.setItem(SMART_TRADING_KEY, JSON.stringify(updated));
+    console.log('⚙️ تم حفظ إعدادات التداول الذكي:', updated);
+  } catch (error) {
+    console.error('خطأ في حفظ إعدادات التداول الذكي:', error);
+  }
+};
+
+// ================= دوال الحالة =================
+
+export const getSmartTradingState = (): SmartTradingState => {
+  try {
+    const stored = localStorage.getItem(SMART_TRADING_STATE_KEY);
+    if (stored) {
+      return { ...DEFAULT_STATE, ...JSON.parse(stored) };
+    }
+  } catch (error) {
+    console.error('خطأ في قراءة حالة التداول الذكي:', error);
+  }
+  return DEFAULT_STATE;
+};
+
+export const saveSmartTradingState = (state: Partial<SmartTradingState>): void => {
+  try {
+    const current = getSmartTradingState();
+    const updated = { 
+      ...current, 
+      ...state, 
+      lastUpdated: new Date().toISOString() 
+    };
+    localStorage.setItem(SMART_TRADING_STATE_KEY, JSON.stringify(updated));
+    console.log('📊 تم حفظ حالة التداول الذكي:', updated);
+  } catch (error) {
+    console.error('خطأ في حفظ حالة التداول الذكي:', error);
+  }
+};
+
+export const resetSmartTradingState = (): void => {
+  localStorage.setItem(SMART_TRADING_STATE_KEY, JSON.stringify(DEFAULT_STATE));
+  console.log('🔄 تم إعادة تعيين حالة التداول الذكي');
+};
+
+// ================= دوال المنطق الرئيسية =================
+
+/**
+ * التحقق من أن الرصيد كافي للشراء
+ */
+export const checkSufficientBalance = (usdtBalance: number): { 
+  sufficient: boolean; 
+  required: number; 
+  available: number;
+  message: string;
+} => {
+  const settings = getSmartTradingSettings();
+  const required = settings.coinsPerCycle * settings.buyAmount;
+  const sufficient = usdtBalance >= required;
+  
+  return {
+    sufficient,
+    required,
+    available: usdtBalance,
+    message: sufficient 
+      ? `✅ الرصيد كافي: $${usdtBalance.toFixed(2)} (مطلوب: $${required})`
+      : `⚠️ الرصيد غير كافي! متوفر: $${usdtBalance.toFixed(2)} - مطلوب: $${required}`,
+  };
+};
+
+/**
+ * التحقق من أن المحفظة غير ممتلئة
+ */
+export const checkPortfolioCapacity = (currentCoins: number): {
+  hasCapacity: boolean;
+  current: number;
+  max: number;
+  message: string;
+} => {
+  const settings = getSmartTradingSettings();
+  const hasCapacity = currentCoins < settings.maxPortfolioCoins;
+  
+  return {
+    hasCapacity,
+    current: currentCoins,
+    max: settings.maxPortfolioCoins,
+    message: hasCapacity 
+      ? `✅ المحفظة متاحة: ${currentCoins}/${settings.maxPortfolioCoins}`
+      : `⚠️ المحفظة ممتلئة! ${currentCoins}/${settings.maxPortfolioCoins}`,
+  };
+};
+
+/**
+ * التحقق من إمكانية بدء دورة جديدة
+ */
+export const canStartNewCycle = (usdtBalance: number, portfolioCoins: number): {
+  canStart: boolean;
+  reasons: string[];
+} => {
+  const settings = getSmartTradingSettings();
+  const state = getSmartTradingState();
+  const reasons: string[] = [];
+  
+  // 1. التحقق من الرصيد
+  const balanceCheck = checkSufficientBalance(usdtBalance);
+  if (!balanceCheck.sufficient) {
+    reasons.push(balanceCheck.message);
+  }
+  
+  // 2. التحقق من المحفظة
+  const capacityCheck = checkPortfolioCapacity(portfolioCoins);
+  if (!capacityCheck.hasCapacity) {
+    reasons.push(capacityCheck.message);
+  }
+  
+  // 3. التحقق من أن الدورة الحالية مكتملة
+  if (state.pendingCoins.length >= settings.coinsPerCycle) {
+    reasons.push(`⏳ يوجد ${state.pendingCoins.length} عملات قيد الانتظار`);
+  }
+  
+  return {
+    canStart: reasons.length === 0,
+    reasons,
+  };
+};
+
+/**
+ * الحصول على نسبة الربح الحالية
+ */
+export const getCurrentProfitPercent = (): number => {
+  const state = getSmartTradingState();
+  return state.currentProfitPercent;
+};
+
+/**
+ * تسجيل عملية شراء جديدة
+ */
+export const registerBuy = (coinSymbol: string): void => {
+  const state = getSmartTradingState();
+  const pendingCoins = [...state.pendingCoins];
+  
+  if (!pendingCoins.includes(coinSymbol)) {
+    pendingCoins.push(coinSymbol);
+  }
+  
+  saveSmartTradingState({ pendingCoins });
+  console.log(`🛒 تم تسجيل شراء ${coinSymbol} - العملات المعلقة: ${pendingCoins.length}`);
+};
+
+/**
+ * تسجيل عملية بيع وتحديث الدورة
+ */
+export const registerSell = (coinSymbol: string, profit: number): {
+  cycleCompleted: boolean;
+  newProfitPercent: number;
+} => {
+  const settings = getSmartTradingSettings();
+  const state = getSmartTradingState();
+  
+  // إزالة العملة من المعلقة
+  const pendingCoins = state.pendingCoins.filter(c => c !== coinSymbol);
+  
+  // زيادة عداد المباعة
+  const soldInCurrentCycle = state.soldInCurrentCycle + 1;
+  const totalProfit = state.totalProfit + profit;
+  
+  // التحقق من اكتمال الدورة
+  const cycleCompleted = soldInCurrentCycle >= settings.coinsPerCycle;
+  
+  let newProfitPercent = state.currentProfitPercent;
+  let newCycle = state.currentCycle;
+  let totalCyclesCompleted = state.totalCyclesCompleted;
+  let newSoldInCycle = soldInCurrentCycle;
+  
+  if (cycleCompleted) {
+    // زيادة النسبة
+    newProfitPercent = state.currentProfitPercent + settings.profitIncrement;
+    
+    // إذا تجاوزت الحد الأقصى، ترجع للبداية
+    if (newProfitPercent > settings.maxProfitPercent) {
+      newProfitPercent = settings.startProfitPercent;
+      console.log('🔄 النسبة وصلت 100% - ترجع لـ 5%');
+    }
+    
+    newCycle = state.currentCycle + 1;
+    totalCyclesCompleted = state.totalCyclesCompleted + 1;
+    newSoldInCycle = 0;
+    
+    console.log(`🎉 اكتملت الدورة ${state.currentCycle}! النسبة الجديدة: ${newProfitPercent}%`);
+  }
+  
+  saveSmartTradingState({
+    pendingCoins,
+    soldInCurrentCycle: newSoldInCycle,
+    currentProfitPercent: newProfitPercent,
+    currentCycle: newCycle,
+    totalCyclesCompleted,
+    totalProfit,
+  });
+  
+  console.log(`💰 تم بيع ${coinSymbol} بربح $${profit.toFixed(2)} - المباعة: ${newSoldInCycle}/${settings.coinsPerCycle}`);
+  
+  return {
+    cycleCompleted,
+    newProfitPercent,
+  };
+};
+
+/**
+ * الحصول على عدد العملات المتبقية لاكتمال الدورة
+ */
+export const getRemainingForCycle = (): {
+  sold: number;
+  total: number;
+  remaining: number;
+} => {
+  const settings = getSmartTradingSettings();
+  const state = getSmartTradingState();
+  
+  return {
+    sold: state.soldInCurrentCycle,
+    total: settings.coinsPerCycle,
+    remaining: settings.coinsPerCycle - state.soldInCurrentCycle,
+  };
+};
+
+/**
+ * الحصول على ملخص الحالة
+ */
+export const getSmartTradingSummary = (): {
+  enabled: boolean;
+  currentCycle: number;
+  currentProfitPercent: number;
+  soldInCycle: string;
+  pendingCoins: number;
+  totalCycles: number;
+  totalProfit: number;
+  nextProfitPercent: number;
+} => {
+  const settings = getSmartTradingSettings();
+  const state = getSmartTradingState();
+  
+  let nextProfitPercent = state.currentProfitPercent + settings.profitIncrement;
+  if (nextProfitPercent > settings.maxProfitPercent) {
+    nextProfitPercent = settings.startProfitPercent;
+  }
+  
+  return {
+    enabled: settings.enabled,
+    currentCycle: state.currentCycle,
+    currentProfitPercent: state.currentProfitPercent,
+    soldInCycle: `${state.soldInCurrentCycle}/${settings.coinsPerCycle}`,
+    pendingCoins: state.pendingCoins.length,
+    totalCycles: state.totalCyclesCompleted,
+    totalProfit: state.totalProfit,
+    nextProfitPercent,
+  };
+};

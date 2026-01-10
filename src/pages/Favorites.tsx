@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Heart, ArrowRight, Trophy, Star, Trash2, ShoppingCart, DollarSign, Settings, CheckCircle2, XCircle, Loader2, AlertTriangle, Zap, TrendingUp, History } from "lucide-react";
+import { Heart, ArrowRight, Trophy, Star, Trash2, ShoppingCart, DollarSign, Settings, CheckCircle2, XCircle, Loader2, AlertTriangle, Zap, TrendingUp, History, Brain, Target, Repeat } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CoinLaunchDate } from "@/components/CoinLaunchDate";
 import { CoinProject } from "@/components/CoinProject";
@@ -12,6 +12,12 @@ import { CoinCategory } from "@/components/CoinCategory";
 import { getCoinLaunchDateISO } from "@/hooks/useCoinMetadata";
 import { hasCredentials, getAutoSellSettings, saveAutoSellSettings } from "@/services/binanceTrading";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  getSmartTradingSettings, 
+  saveSmartTradingSettings, 
+  getSmartTradingSummary,
+  resetSmartTradingState
+} from "@/services/smartTradingService";
 
 const Favorites = () => {
   const navigate = useNavigate();
@@ -37,6 +43,19 @@ const Favorites = () => {
   // 📈 حالة إعدادات البيع التلقائي
   const [autoSellSettings, setAutoSellSettings] = useState(getAutoSellSettings);
   const [tempProfitPercent, setTempProfitPercent] = useState(String(autoSellSettings.profitPercent));
+
+  // 🎯 حالة التداول الذكي
+  const [smartTradingSettings, setSmartTradingSettings] = useState(getSmartTradingSettings);
+  const [smartTradingSummary, setSmartTradingSummary] = useState(getSmartTradingSummary);
+  const [showSmartSettings, setShowSmartSettings] = useState(false);
+
+  // تحديث ملخص التداول الذكي كل 10 ثواني
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSmartTradingSummary(getSmartTradingSummary());
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // عرض إشعار عند نتيجة الشراء التلقائي
   useEffect(() => {
@@ -428,6 +447,156 @@ const Favorites = () => {
                 ))}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* 🎯 بطاقة التداول الذكي */}
+        <Card className={`border-2 transition-all ${smartTradingSettings.enabled ? 'border-orange-500/50 bg-orange-500/5' : 'border-primary/20 bg-card/50'} backdrop-blur`}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Brain className={`w-5 h-5 ${smartTradingSettings.enabled ? 'text-orange-500' : 'text-muted-foreground'}`} />
+                التداول الذكي
+                {smartTradingSettings.enabled && (
+                  <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+                    مفعل
+                  </span>
+                )}
+              </CardTitle>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSmartSettings(!showSmartSettings)}
+                  className="gap-1"
+                >
+                  <Settings className="w-4 h-4" />
+                  إعدادات
+                </Button>
+                <Switch
+                  checked={smartTradingSettings.enabled}
+                  onCheckedChange={(enabled) => {
+                    if (enabled && !hasApiKeys) {
+                      toast({
+                        title: "⚠️ مطلوب إعداد API",
+                        description: "يجب إعداد مفاتيح Binance API أولاً",
+                        variant: "destructive",
+                      });
+                      navigate('/trading-settings');
+                      return;
+                    }
+                    saveSmartTradingSettings({ enabled });
+                    setSmartTradingSettings(prev => ({ ...prev, enabled }));
+                    setSmartTradingSummary(getSmartTradingSummary());
+                    toast({
+                      title: enabled ? "🎯 تم التفعيل" : "⏸️ تم الإيقاف",
+                      description: enabled 
+                        ? "نظام التداول الذكي يعمل الآن بنسب متصاعدة"
+                        : "تم إيقاف التداول الذكي",
+                    });
+                  }}
+                />
+              </div>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="space-y-4">
+            {/* ملخص الحالة الحالية */}
+            {smartTradingSettings.enabled && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 bg-orange-500/10 rounded-lg text-center">
+                  <p className="text-xs text-muted-foreground">الدورة الحالية</p>
+                  <p className="text-xl font-bold text-orange-500">#{smartTradingSummary.currentCycle}</p>
+                </div>
+                <div className="p-3 bg-green-500/10 rounded-lg text-center">
+                  <p className="text-xs text-muted-foreground">نسبة الربح</p>
+                  <p className="text-xl font-bold text-green-500">{smartTradingSummary.currentProfitPercent}%</p>
+                </div>
+                <div className="p-3 bg-blue-500/10 rounded-lg text-center">
+                  <p className="text-xs text-muted-foreground">المباعة/المطلوب</p>
+                  <p className="text-xl font-bold text-blue-500">{smartTradingSummary.soldInCycle}</p>
+                </div>
+                <div className="p-3 bg-purple-500/10 rounded-lg text-center">
+                  <p className="text-xs text-muted-foreground">قيد الانتظار</p>
+                  <p className="text-xl font-bold text-purple-500">{smartTradingSummary.pendingCoins}</p>
+                </div>
+              </div>
+            )}
+
+            {/* شرح النظام */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Target className="w-4 h-4 text-orange-500" />
+              <span>النسب تتصاعد: 5% → 10% → 15% ... → 100% → 5%</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Repeat className="w-4 h-4 text-orange-500" />
+              <span>كل دورة: {smartTradingSettings.coinsPerCycle} عملات • الحد الأقصى: {smartTradingSettings.maxPortfolioCoins} عملة</span>
+            </div>
+
+            {/* إعدادات التداول الذكي */}
+            {showSmartSettings && (
+              <div className="p-4 bg-muted/30 rounded-lg space-y-4 border border-primary/10">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-orange-500" />
+                  إعدادات التداول الذكي
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-muted-foreground">عدد العملات لكل دورة</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={smartTradingSettings.coinsPerCycle}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 3;
+                        saveSmartTradingSettings({ coinsPerCycle: value });
+                        setSmartTradingSettings(prev => ({ ...prev, coinsPerCycle: value }));
+                      }}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">الحد الأقصى للمحفظة</label>
+                    <Input
+                      type="number"
+                      min="10"
+                      max="100"
+                      value={smartTradingSettings.maxPortfolioCoins}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 50;
+                        saveSmartTradingSettings({ maxPortfolioCoins: value });
+                        setSmartTradingSettings(prev => ({ ...prev, maxPortfolioCoins: value }));
+                      }}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      resetSmartTradingState();
+                      setSmartTradingSummary(getSmartTradingSummary());
+                      toast({
+                        title: "🔄 تم إعادة التعيين",
+                        description: "تم إعادة تعيين الدورة والنسبة إلى البداية",
+                      });
+                    }}
+                    className="text-red-500 border-red-500/50 hover:bg-red-500/10"
+                  >
+                    إعادة تعيين الدورات
+                  </Button>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  💡 عند بيع 3 عملات، تزداد النسبة 5%، وعند 100% ترجع لـ 5%
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

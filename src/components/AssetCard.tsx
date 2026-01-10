@@ -6,6 +6,11 @@ import { useCoinMetadata } from "@/hooks/useCoinMetadata";
 import { getAutoSellSettings, sellAsset, hasCredentials } from "@/services/binanceTrading";
 import { addSellRecord } from "@/services/tradeHistory";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  getSmartTradingSettings, 
+  registerSell, 
+  getCurrentProfitPercent 
+} from "@/services/smartTradingService";
 
 interface AssetCardProps {
   asset: string;
@@ -104,17 +109,24 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     if (asset === 'USDT' || savedInvestment <= 0 || autoSellTriggeredRef.current || isSelling) return;
     
     const autoSellSettings = getAutoSellSettings();
+    const smartTradingSettings = getSmartTradingSettings();
+    
     if (!autoSellSettings.enabled || !hasCredentials()) return;
     
     const currentValue = parseFloat(usdValue);
     const profitPercent = ((currentValue - savedInvestment) / savedInvestment) * 100;
     
+    // 🎯 استخدام نسبة التداول الذكي إذا كان مفعّلاً، وإلا استخدام النسبة الثابتة
+    const targetProfitPercent = smartTradingSettings.enabled 
+      ? getCurrentProfitPercent() 
+      : autoSellSettings.profitPercent;
+    
     // طباعة حالة الفحص للتتبع
-    console.log(`🔍 فحص ${asset}: القيمة $${currentValue.toFixed(2)} | الاستثمار $${savedInvestment} | الربح ${profitPercent.toFixed(2)}% | المطلوب ${autoSellSettings.profitPercent}%`);
+    console.log(`🔍 فحص ${asset}: القيمة $${currentValue.toFixed(2)} | الاستثمار $${savedInvestment} | الربح ${profitPercent.toFixed(2)}% | المطلوب ${targetProfitPercent}%${smartTradingSettings.enabled ? ' (ذكي)' : ''}`);
     
     // التحقق من وصول الربح للنسبة المطلوبة
-    if (profitPercent >= autoSellSettings.profitPercent) {
-      console.log(`🎯 ${asset} وصل للربح ${profitPercent.toFixed(2)}% (المطلوب: ${autoSellSettings.profitPercent}%)`);
+    if (profitPercent >= targetProfitPercent) {
+      console.log(`🎯 ${asset} وصل للربح ${profitPercent.toFixed(2)}% (المطلوب: ${targetProfitPercent}%)`);
       
       // منع التكرار
       autoSellTriggeredRef.current = true;
@@ -143,6 +155,24 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
             profitPercent,
             true
           );
+          
+          // 🎯 تسجيل البيع في نظام التداول الذكي
+          if (smartTradingSettings.enabled) {
+            const sellResult = registerSell(asset, profit);
+            
+            if (sellResult.cycleCompleted) {
+              toast({
+                title: `🎉 اكتملت الدورة!`,
+                description: `النسبة الجديدة: ${sellResult.newProfitPercent}% - سيبدأ البحث عن عملات جديدة`,
+              });
+              
+              // 🔄 تفعيل البحث التلقائي لبدء دورة جديدة
+              // إرسال حدث مخصص لتفعيل البحث
+              window.dispatchEvent(new CustomEvent('smart-trading-cycle-complete', {
+                detail: { newProfitPercent: sellResult.newProfitPercent }
+              }));
+            }
+          }
           
           // مسح مبلغ الاستثمار بعد البيع
           localStorage.removeItem(`investment_${asset}`);

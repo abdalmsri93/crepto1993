@@ -7,6 +7,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { SearchCoin } from '@/utils/advancedSearch';
 import { getDualAIAnalysis, DualAnalysis } from '@/lib/ai-analysis';
+import { 
+  getSmartTradingSettings, 
+  getSmartTradingState,
+  checkSufficientBalance,
+  checkPortfolioCapacity,
+  canStartNewCycle,
+  registerBuy,
+  getCurrentProfitPercent,
+  saveSmartTradingState
+} from '@/services/smartTradingService';
 
 // 🔧 دالة لحساب معايير Binance تلقائياً (نفس البحث اليدوي)
 function calculateBinanceMetrics(ticker: any) {
@@ -142,6 +152,28 @@ function getUSDTBalance(): number {
     return 0;
   } catch (error) {
     console.error('❌ خطأ في قراءة رصيد USDT:', error);
+    return 0;
+  }
+}
+
+// دالة حساب عدد العملات في المحفظة (غير USDT)
+function getPortfolioCoinsCount(): number {
+  try {
+    const portfolioData = localStorage.getItem('binance_portfolio_data');
+    if (portfolioData) {
+      const data = JSON.parse(portfolioData);
+      if (data.balances) {
+        // عد العملات التي قيمتها > $1 (غير USDT)
+        return data.balances.filter((b: any) => {
+          const asset = b.asset?.toUpperCase();
+          const value = parseFloat(b.usdValue || '0');
+          return asset !== 'USDT' && value > 1;
+        }).length;
+      }
+    }
+    return 0;
+  } catch (error) {
+    console.error('❌ خطأ في حساب عدد العملات:', error);
     return 0;
   }
 }
@@ -365,7 +397,6 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
     }
     
     console.log('🚀 ======= بدء دورة بحث جديدة =======');
-    console.log(`📊 رقم الدورة التقريبي من الـ status`);
     
     setStatus(prev => ({ ...prev, isSearching: true, error: null }));
     addLog('info', '🚀 بدء دورة بحث جديدة');
@@ -373,6 +404,39 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
     try {
       const usdtBalance = getUSDTBalance();
       addLog('info', `💰 رصيد USDT: $${usdtBalance.toFixed(2)}`);
+      
+      // 🎯 التحقق من شروط التداول الذكي
+      const smartSettings = getSmartTradingSettings();
+      const smartState = getSmartTradingState();
+      
+      if (smartSettings.enabled) {
+        addLog('info', `🎯 نظام التداول الذكي مفعّل - الدورة ${smartState.currentCycle} - النسبة ${smartState.currentProfitPercent}%`);
+        
+        // التحقق من الرصيد الكافي لـ 3 عملات
+        const requiredBalance = smartSettings.coinsPerCycle * smartSettings.buyAmount;
+        if (usdtBalance < requiredBalance) {
+          addLog('warning', `⛔ الرصيد غير كافي! متوفر: $${usdtBalance.toFixed(2)} - مطلوب: $${requiredBalance}`);
+          setStatus(prev => ({ ...prev, isSearching: false }));
+          return;
+        }
+        
+        // التحقق من عدد العملات المعلقة
+        if (smartState.pendingCoins.length >= smartSettings.coinsPerCycle) {
+          addLog('warning', `⏳ يوجد ${smartState.pendingCoins.length} عملات قيد الانتظار - انتظر البيع`);
+          setStatus(prev => ({ ...prev, isSearching: false }));
+          return;
+        }
+        
+        // التحقق من المحفظة
+        const portfolioCoins = getPortfolioCoinsCount();
+        if (portfolioCoins >= smartSettings.maxPortfolioCoins) {
+          addLog('warning', `⛔ المحفظة ممتلئة! ${portfolioCoins}/${smartSettings.maxPortfolioCoins}`);
+          setStatus(prev => ({ ...prev, isSearching: false }));
+          return;
+        }
+        
+        addLog('success', `✅ جميع الشروط متوفرة - بدء البحث عن ${smartSettings.coinsPerCycle} عملات`);
+      }
       
       if (usdtBalance < MIN_USDT_BALANCE) {
         addLog('warning', `⛔ الرصيد أقل من $${MIN_USDT_BALANCE}`);
@@ -404,8 +468,20 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       let addedInCycle = 0;
       let skippedInCycle = 0;
       
+      // 🎯 تحديد الحد الأقصى للإضافة (3 عملات في التداول الذكي)
+      // إعادة استخدام المتغيرات المحلية
+      const maxToAdd = smartSettings.enabled 
+        ? smartSettings.coinsPerCycle - smartState.pendingCoins.length 
+        : COINS_PER_SEARCH;
+      
       for (const coin of selectedCoins) {
         if (!isRunningRef.current) break;
+        
+        // 🎯 التوقف إذا وصلنا للحد المطلوب
+        if (smartSettings.enabled && addedInCycle >= maxToAdd) {
+          addLog('success', `🎯 تم إضافة ${addedInCycle} عملات - الحد المطلوب`);
+          break;
+        }
         
         setStatus(prev => ({ ...prev, currentCoin: coin.symbol }));
         addLog('info', `🔎 تحليل ${coin.symbol}...`, coin.symbol);
@@ -442,6 +518,13 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
             if (addToFavorites(coin)) {
               addedInCycle++;
               addLog('success', `⭐ تمت الإضافة للمفضلات`, coin.symbol);
+              
+              // 🎯 تسجيل في نظام التداول الذكي
+              if (smartSettings.enabled) {
+                registerBuy(coin.symbol);
+                const currentProfitPercent = getCurrentProfitPercent();
+                addLog('info', `📈 نسبة البيع لهذه العملة: ${currentProfitPercent}%`, coin.symbol);
+              }
             } else {
               skippedInCycle++;
               addLog('warning', `موجودة مسبقاً`, coin.symbol);
@@ -455,6 +538,11 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
         } catch (error: any) {
           addLog('error', `خطأ: ${error.message}`, coin.symbol);
         }
+      }
+      
+      // 🎯 إيقاف البحث مؤقتاً إذا تمت إضافة 3 عملات
+      if (smartSettings.enabled && addedInCycle >= maxToAdd) {
+        addLog('success', `⏸️ تم إضافة ${addedInCycle} عملات - البحث سيتوقف حتى يتم بيعها`);
       }
       
       setStatus(prev => ({
@@ -660,6 +748,34 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       window.clearInterval(healthCheck);
     };
   }, [runSearchCycle]);
+
+  // 🎯 الاستماع لحدث اكتمال دورة التداول الذكي
+  useEffect(() => {
+    const handleCycleComplete = (event: CustomEvent) => {
+      console.log('🎉 استلام حدث اكتمال الدورة:', event.detail);
+      addLog('success', `🎉 اكتملت دورة التداول! النسبة الجديدة: ${event.detail.newProfitPercent}%`);
+      
+      // إذا كان البحث يعمل، نبدأ دورة جديدة فوراً
+      if (isRunningRef.current) {
+        addLog('info', '🔄 بدء البحث عن عملات جديدة...');
+        setTimeout(() => {
+          runSearchCycle().catch(err => {
+            console.error('خطأ في بدء دورة جديدة:', err);
+          });
+        }, 3000); // انتظار 3 ثواني قبل البدء
+      } else {
+        // إذا كان البحث متوقفاً، نشغله تلقائياً
+        addLog('info', '🚀 تشغيل البحث التلقائي لدورة جديدة...');
+        startAutoSearch();
+      }
+    };
+    
+    window.addEventListener('smart-trading-cycle-complete', handleCycleComplete as EventListener);
+    
+    return () => {
+      window.removeEventListener('smart-trading-cycle-complete', handleCycleComplete as EventListener);
+    };
+  }, [runSearchCycle, startAutoSearch, addLog]);
 
   // تنظيف عند إغلاق التطبيق فقط
   useEffect(() => {
