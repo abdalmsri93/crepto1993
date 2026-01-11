@@ -1,6 +1,25 @@
 {
-  "currentVersion": "3.6",
+  "currentVersion": "5.1",
   "versions": [
+    {
+      "version": "5.1",
+      "date": "2026-01-11",
+      "description": "نظام التداول الذكي المحسّن - نسب واقعية + نطاق سعر ذكي",
+      "features": [
+        "نظام نسب ربح جديد: 3% → 5% → 7% → 9% → 11% → 13% → 15%",
+        "نطاق سعر ذكي يتغير حسب نسبة الربح",
+        "بحث تلقائي كل 3 دقائق",
+        "تشغيل البحث تلقائياً عند فتح الموقع",
+        "واجهة جديدة لعرض النسبة الحالية (للعرض فقط)",
+        "شريط مرئي يوضح موقعك في دورة النسب"
+      ],
+      "files": [
+        "services/smartTradingService.ts",
+        "contexts/AutoSearchContext.tsx",
+        "pages/Index.tsx",
+        "pages/Favorites.tsx"
+      ]
+    },
     {
       "version": "3.6",
       "date": "2025-12-29",
