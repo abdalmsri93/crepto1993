@@ -40,15 +40,15 @@ const DEFAULT_SETTINGS: SmartTradingSettings = {
   coinsPerCycle: 1,          // ← عملة واحدة = زيادة النسبة
   maxPortfolioCoins: 50,
   buyAmount: 5,
-  startProfitPercent: 5,
-  profitIncrement: 5,
-  maxProfitPercent: 100,
+  startProfitPercent: 3,     // ← نسبة البداية 3%
+  profitIncrement: 2,        // ← زيادة +2% كل دورة
+  maxProfitPercent: 15,      // ← أقصى نسبة 15%
 };
 
 // الحالة الافتراضية
 const DEFAULT_STATE: SmartTradingState = {
   currentCycle: 1,
-  currentProfitPercent: 5,
+  currentProfitPercent: 3,   // ← تبدأ من 3%
   soldInCurrentCycle: 0,
   totalCyclesCompleted: 0,
   totalProfit: 0,
@@ -234,18 +234,23 @@ export const removeCoinTargetProfit = (coinSymbol: string): void => {
 
 /**
  * تعيين نسب البيع للعملات الموجودة تلقائياً
- * تُعيد تعيين النسب دائماً حسب الترتيب (5%, 10%, 15%...)
+ * تُعيد تعيين النسب دائماً حسب الترتيب (3%, 5%, 7%...)
  */
 export const assignProfitPercentsToExistingCoins = (coins: string[]): void => {
   const settings = getSmartTradingSettings();
-  let currentPercent = settings.startProfitPercent; // 5%
+  let currentPercent = settings.startProfitPercent; // 3%
+  
+  // 🔄 مسح النسب القديمة أولاً لضمان التحديث
+  for (const coin of coins) {
+    localStorage.removeItem(`coin_target_profit_${coin}`);
+  }
   
   for (const coin of coins) {
-    // تعيين النسبة دائماً (إعادة تعيين)
+    // تعيين النسبة الجديدة (3% → 5% → 7% ...)
     saveCoinTargetProfit(coin, currentPercent);
     console.log(`🎯 تعيين ${coin}: ${currentPercent}%`);
     
-    // زيادة النسبة للعملة التالية
+    // زيادة النسبة للعملة التالية (+2%)
     currentPercent += settings.profitIncrement;
     if (currentPercent > settings.maxProfitPercent) {
       currentPercent = settings.startProfitPercent;
@@ -299,7 +304,7 @@ export const registerSell = (coinSymbol: string, profit: number): {
   // إذا تجاوزت الحد الأقصى، ترجع للبداية
   if (newProfitPercent > settings.maxProfitPercent) {
     newProfitPercent = settings.startProfitPercent;
-    console.log('🔄 النسبة وصلت 100% - ترجع لـ 5%');
+    console.log('🔄 النسبة وصلت 15% - ترجع لـ 3%');
   }
   
   const newCycle = state.currentCycle + 1;
