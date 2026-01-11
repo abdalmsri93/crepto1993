@@ -361,7 +361,7 @@ const Favorites = () => {
                   toast({
                     title: enabled ? "📈 تم التفعيل" : "⏸️ تم الإيقاف",
                     description: enabled 
-                      ? `سيتم بيع العملات تلقائياً عند وصول الربح إلى ${autoSellSettings.profitPercent}%`
+                      ? `سيتم بيع العملات تلقائياً حسب النسب الذكية (3% → 15%)`
                       : "تم إيقاف البيع التلقائي",
                   });
                 }}
@@ -375,7 +375,7 @@ const Favorites = () => {
                 {autoSellSettings.enabled ? (
                   <>
                     <TrendingUp className="w-4 h-4 text-purple-500" />
-                    <span className="text-purple-500">سيتم البيع عند وصول الربح للنسبة المحددة</span>
+                    <span className="text-purple-500">البيع يتم تلقائياً حسب النسب المتصاعدة</span>
                   </>
                 ) : (
                   <>
@@ -385,69 +385,49 @@ const Favorites = () => {
                 )}
               </div>
               <div className="flex items-center gap-1 text-purple-400 font-bold">
-                <TrendingUp className="w-4 h-4" />
-                {autoSellSettings.profitPercent}%
+                <Target className="w-4 h-4" />
+                {smartTradingSummary.currentProfitPercent}%
               </div>
             </div>
 
-            {/* إعدادات نسبة الربح */}
-            <div className="p-4 bg-muted/30 rounded-lg space-y-4 border border-primary/10">
+            {/* عرض النسبة الحالية من النظام الذكي */}
+            <div className="p-4 bg-muted/30 rounded-lg space-y-4 border border-purple-500/20">
               <h4 className="font-semibold flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-purple-400" />
-                نسبة الربح للبيع
+                <Target className="w-4 h-4 text-purple-400" />
+                نسبة الربح للعملة القادمة (تلقائي)
               </h4>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min="1"
-                  max="100"
-                  step="1"
-                  value={tempProfitPercent}
-                  onChange={(e) => setTempProfitPercent(e.target.value)}
-                  className="flex-1"
-                  placeholder="نسبة الربح %"
-                />
-                <Button 
-                  onClick={() => {
-                    const percent = parseFloat(tempProfitPercent);
-                    if (percent >= 1 && percent <= 100) {
-                      saveAutoSellSettings({ profitPercent: percent });
-                      setAutoSellSettings(prev => ({ ...prev, profitPercent: percent }));
-                      toast({
-                        title: "✅ تم الحفظ",
-                        description: `سيتم البيع عند وصول الربح إلى ${percent}%`,
-                      });
-                    } else {
-                      toast({
-                        title: "⚠️ خطأ",
-                        description: "النسبة يجب أن تكون بين 1% و 100%",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  className="bg-purple-500 hover:bg-purple-600"
-                >
-                  حفظ
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                مثال: إذا استثمرت $5 ونسبة الربح 10%، سيتم البيع عند وصول القيمة إلى $5.50
-              </p>
               
-              {/* أزرار النسب السريعة */}
-              <div className="flex flex-wrap gap-2">
-                {[5, 10, 15, 20, 25, 50].map((percent) => (
-                  <Button
+              {/* النسبة الحالية الكبيرة */}
+              <div className="text-center py-4">
+                <div className="text-5xl font-bold text-purple-400">
+                  {smartTradingSummary.currentProfitPercent}%
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  النسبة المستهدفة للعملة القادمة
+                </p>
+              </div>
+              
+              {/* شريط التقدم المرئي */}
+              <div className="flex items-center justify-between gap-1 text-xs">
+                {[3, 5, 7, 9, 11, 13, 15].map((percent) => (
+                  <div
                     key={percent}
-                    variant={parseFloat(tempProfitPercent) === percent ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setTempProfitPercent(String(percent))}
-                    className={parseFloat(tempProfitPercent) === percent ? "bg-purple-500" : ""}
+                    className={`flex-1 text-center py-2 rounded transition-all ${
+                      smartTradingSummary.currentProfitPercent === percent
+                        ? 'bg-purple-500 text-white font-bold scale-110'
+                        : smartTradingSummary.currentProfitPercent > percent
+                        ? 'bg-purple-500/30 text-purple-300'
+                        : 'bg-muted/50 text-muted-foreground'
+                    }`}
                   >
                     {percent}%
-                  </Button>
+                  </div>
                 ))}
               </div>
+              
+              <p className="text-xs text-muted-foreground text-center">
+                🔄 النسبة تزداد +2% مع كل عملة جديدة، وترجع لـ 3% بعد 15%
+              </p>
             </div>
           </CardContent>
         </Card>
