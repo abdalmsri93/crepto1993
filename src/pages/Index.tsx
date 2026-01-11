@@ -39,6 +39,7 @@ const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'testing' | 'unknown'>('unknown');
   const [showAutoSearch, setShowAutoSearch] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -58,6 +59,19 @@ const Index = () => {
     
     return () => clearInterval(interval);
   }, []);
+  
+  // 🔄 إعادة المحاولة تلقائياً إذا فشل التحميل
+  useEffect(() => {
+    if (connectionStatus === 'disconnected' && retryCount < 3) {
+      const retryTimer = setTimeout(() => {
+        console.log(`🔄 إعادة المحاولة ${retryCount + 1}/3...`);
+        setRetryCount(prev => prev + 1);
+        fetchPortfolio();
+      }, 2000); // انتظر 2 ثانية ثم أعد المحاولة
+      
+      return () => clearTimeout(retryTimer);
+    }
+  }, [connectionStatus, retryCount]);
 
   const fetchPortfolio = async () => {
     
@@ -189,6 +203,7 @@ const Index = () => {
       
       setPortfolio(data);
       setConnectionStatus('connected');
+      setRetryCount(0); // إعادة تعيين العداد عند النجاح
       
       toast({
         title: "تم التحديث بنجاح",
