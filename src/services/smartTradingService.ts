@@ -62,7 +62,17 @@ export const getSmartTradingSettings = (): SmartTradingSettings => {
   try {
     const stored = localStorage.getItem(SMART_TRADING_KEY);
     if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      const savedSettings = JSON.parse(stored);
+      // 🔄 إجبار تحديث النسب للنظام الجديد (3% → 15%)
+      const updated = { 
+        ...DEFAULT_SETTINGS, 
+        ...savedSettings,
+        // إجبار النسب الجديدة
+        startProfitPercent: DEFAULT_SETTINGS.startProfitPercent,
+        profitIncrement: DEFAULT_SETTINGS.profitIncrement,
+        maxProfitPercent: DEFAULT_SETTINGS.maxProfitPercent,
+      };
+      return updated;
     }
   } catch (error) {
     console.error('خطأ في قراءة إعدادات التداول الذكي:', error);
