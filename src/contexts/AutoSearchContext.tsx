@@ -58,9 +58,20 @@ function calculateBinanceMetrics(ticker: any) {
 }
 
 // ثوابت النظام
-const DEFAULT_INTERVAL = 5 * 60 * 1000; // 5 دقائق
+const DEFAULT_INTERVAL = 3 * 60 * 1000; // 3 دقائق
 const COINS_PER_SEARCH = 5;
 const MIN_USDT_BALANCE = 1;
+
+// 🎯 نطاق السعر حسب نسبة الربح (ثابت)
+const PRICE_RANGE_BY_PROFIT: { [key: number]: number } = {
+  3: 5.00,    // نسبة 3% → سعر حتى $5.00
+  5: 3.00,    // نسبة 5% → سعر حتى $3.00
+  7: 2.00,    // نسبة 7% → سعر حتى $2.00
+  9: 1.00,    // نسبة 9% → سعر حتى $1.00
+  11: 0.50,   // نسبة 11% → سعر حتى $0.50
+  13: 0.30,   // نسبة 13% → سعر حتى $0.30
+  15: 0.20,   // نسبة 15% → سعر حتى $0.20
+};
 
 // مفاتيح localStorage
 const AUTO_SEARCH_KEY = 'auto_search_settings';
@@ -113,13 +124,35 @@ interface AutoSearchContextType {
 
 const AutoSearchContext = createContext<AutoSearchContextType | null>(null);
 
-// دالة حساب نطاق السعر
+// دالة حساب نطاق السعر حسب نسبة الربح الحالية
 function calculatePriceRange(usdtBalance: number): { min: number; max: number } {
   if (usdtBalance < MIN_USDT_BALANCE) {
     return { min: 0, max: 0 };
   }
-  const maxPrice = Math.max(1, Math.ceil(usdtBalance / 100));
-  return { min: 0.000001, max: maxPrice };
+  // جلب نسبة الربح الحالية
+  const currentProfitPercent = getCurrentProfitPercentForSearch();
+  
+  // الحصول على الحد الأقصى للسعر حسب النسبة
+  const maxPrice = PRICE_RANGE_BY_PROFIT[currentProfitPercent] || 5.00;
+  
+  console.log(`🎯 نسبة الربح: ${currentProfitPercent}% → نطاق السعر: $0.0001 - $${maxPrice}`);
+  
+  return { min: 0.0001, max: maxPrice };
+}
+
+// دالة مساعدة لجلب نسبة الربح الحالية للبحث
+function getCurrentProfitPercentForSearch(): number {
+  try {
+    const stateKey = 'smart_trading_state';
+    const stored = localStorage.getItem(stateKey);
+    if (stored) {
+      const state = JSON.parse(stored);
+      return state.currentProfitPercent || 3;
+    }
+  } catch (error) {
+    console.error('خطأ في قراءة نسبة الربح:', error);
+  }
+  return 3; // النسبة الافتراضية
 }
 
 // دالة قراءة رصيد USDT
@@ -458,8 +491,10 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
         return;
       }
       
+      // 🎯 جلب نسبة الربح الحالية لتحديد نطاق السعر
+      const currentProfitPercent = getCurrentProfitPercentForSearch();
       const priceRange = calculatePriceRange(usdtBalance);
-      addLog('info', `📊 نطاق السعر: $${priceRange.min} - $${priceRange.max}`);
+      addLog('info', `🎯 نسبة الربح: ${currentProfitPercent}% → نطاق السعر: $${priceRange.min} - $${priceRange.max}`);
       
       addLog('info', '🔍 جاري البحث...');
       const allCoins = await fetchAndFilterCoins(priceRange);
