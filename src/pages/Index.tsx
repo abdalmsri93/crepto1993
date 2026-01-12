@@ -13,6 +13,7 @@ import { useAutoSearch } from "@/contexts/AutoSearchContext";
 import { assignProfitPercentsToExistingCoins } from "@/services/smartTradingService";
 import { addBuyRecord, getTradeHistory } from "@/services/tradeHistory";
 import { DUST_THRESHOLD } from "@/services/investmentBackupService";
+import { updateCachedBalance } from "@/services/binanceTrading";
 import type { Session } from "@supabase/supabase-js";
 
 interface Balance {
@@ -177,6 +178,14 @@ const Index = () => {
       if (data) {
         localStorage.setItem('binance_portfolio_data', JSON.stringify(data));
         console.log('💾 تم حفظ بيانات المحفظة');
+        
+        // 💰 حفظ رصيد USDT المتاح باستخدام الدالة المركزية
+        const usdtAsset = data.balances?.find((b: any) => b.asset?.toUpperCase() === 'USDT');
+        if (usdtAsset) {
+          const usdtFree = parseFloat(usdtAsset.free || usdtAsset.total || '0');
+          updateCachedBalance(usdtFree);
+          console.log('💰 تحديث رصيد USDT المركزي:', usdtFree);
+        }
       }
       
       // حفظ عملات المحفظة في localStorage للفلترة التلقائية للمفضلات

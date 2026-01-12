@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, ExternalLink, Calendar, Tag, Loader2, Plus, DollarSign, Wallet, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingUp, ExternalLink, Calendar, Tag, Loader2, Plus, DollarSign, Wallet, ChevronDown, ChevronUp, Zap } from "lucide-react";
 import { useCoinMetadata } from "@/hooks/useCoinMetadata";
 import { getAutoSellSettings, sellAsset, hasCredentials } from "@/services/binanceTrading";
 import { addSellRecord } from "@/services/tradeHistory";
@@ -73,8 +73,14 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const [isSelling, setIsSelling] = useState<boolean>(false);
   const autoSellTriggeredRef = useRef<boolean>(false);
   const [checkCounter, setCheckCounter] = useState<number>(0); // لإجبار الفحص الدوري
-  
-  // � التحقق إذا كانت العملة مباعة أو غبار
+    // ⚡ حالة الرافعة المالية
+  const [marginInfo, setMarginInfo] = useState<{
+    isMargin: boolean;
+    leverage: number;
+    originalAmount: number;
+    effectiveAmount: number;
+  } | null>(null);
+    // � التحقق إذا كانت العملة مباعة أو غبار
   const currentValue = parseFloat(usdValue);
   const isSoldOrDust = isCoinSold(asset) || isDustCoin(currentValue);
   
@@ -85,6 +91,7 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
       setSavedInvestment(0);
       setSavedTargetProfit(0);
       setTotalBoost(0);
+      setMarginInfo(null);
       return;
     }
     
@@ -92,6 +99,25 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     const savedBoost = localStorage.getItem(`boost_${asset}`);
     if (savedBoost) {
       setTotalBoost(parseFloat(savedBoost));
+    }
+    
+    // ⚡ تحميل بيانات الرافعة المالية
+    const marginData = localStorage.getItem(`margin_position_${asset}`);
+    if (marginData) {
+      try {
+        const parsed = JSON.parse(marginData);
+        setMarginInfo({
+          isMargin: true,
+          leverage: parsed.leverage || 1,
+          originalAmount: parsed.originalAmount || 0,
+          effectiveAmount: parsed.effectiveAmount || 0,
+        });
+        console.log(`⚡ تم تحميل بيانات Margin لـ ${asset}: رافعة ${parsed.leverage}x`);
+      } catch (e) {
+        setMarginInfo(null);
+      }
+    } else {
+      setMarginInfo(null);
     }
     
     // 🔒 تحميل بيانات الاستثمار من النسخة الاحتياطية (أو localStorage)
@@ -274,9 +300,20 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-orbitron font-bold text-lg group-hover:text-crypto-gold transition-colors">{asset}</h3>
+                {/* ⚡ شارة الرافعة المالية بجانب الاسم */}
+                {marginInfo && marginInfo.isMargin && marginInfo.leverage > 1 && (
+                  <span className="flex items-center gap-1 bg-gradient-to-r from-orange-500/30 to-red-500/30 text-orange-400 text-xs font-bold px-2 py-0.5 rounded-full border border-orange-500/50 animate-pulse">
+                    <Zap className="w-3 h-3" />
+                    {marginInfo.leverage}x
+                  </span>
+                )}
                 <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <p className="text-xs text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">عملة رقمية</p>
+              <p className="text-xs text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
+                {marginInfo && marginInfo.isMargin && marginInfo.leverage > 1 
+                  ? `تداول بالهامش • رافعة ${marginInfo.leverage}x` 
+                  : 'عملة رقمية'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -303,6 +340,30 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
               ${parseFloat(usdValue).toLocaleString()}
             </span>
           </div>
+          
+          {/* ⚡ عرض معلومات الرافعة المالية */}
+          {marginInfo && marginInfo.isMargin && marginInfo.leverage > 1 && (
+            <div className="p-3 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-lg border border-orange-500/30 animate-pulse-slow">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2 text-orange-400 text-sm font-semibold">
+                  <Zap className="w-4 h-4" />
+                  <span>رافعة مالية</span>
+                  <span className="bg-orange-500/20 px-2 py-0.5 rounded-full text-orange-300 font-bold">
+                    {marginInfo.leverage}x
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-orbitron text-orange-400 font-bold text-lg">
+                    ${marginInfo.effectiveAmount?.toFixed(2) || '0'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground/70">
+                <span>المبلغ الأصلي: ${marginInfo.originalAmount?.toFixed(2) || '0'}</span>
+                <span className="text-orange-400/80">⚠️ تداول عالي المخاطر</span>
+              </div>
+            </div>
+          )}
           
           {/* 💎 قسم المجموع الكلي - يظهر دائماً */}
           {isSoldOrDust && asset !== 'USDT' ? (

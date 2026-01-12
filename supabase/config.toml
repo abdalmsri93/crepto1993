@@ -11,3 +11,15 @@ verify_jwt = false
 
 [functions.enrich-coin]
 verify_jwt = false
+
+[functions.margin-buy]
+verify_jwt = false
+
+[functions.margin-transfer]
+verify_jwt = false
+
+[functions.margin-borrow]
+verify_jwt = false
+
+[functions.margin-order]
+verify_jwt = false

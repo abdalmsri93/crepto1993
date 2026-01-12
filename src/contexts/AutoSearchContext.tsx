@@ -17,7 +17,7 @@ import {
   getCurrentProfitPercent,
   saveSmartTradingState
 } from '@/services/smartTradingService';
-import { buyWithAmount, hasCredentials, getAutoBuySettings } from '@/services/binanceTrading';
+import { buyWithAmount, hasCredentials, getAutoBuySettings, getAccountBalance, getUSDTBalance, getCachedUSDTBalance } from '@/services/binanceTrading';
 import { addBuyRecord } from '@/services/tradeHistory';
 
 // 🔧 دالة لحساب معايير Binance تلقائياً (نفس البحث اليدوي)
@@ -174,60 +174,20 @@ function getCurrentProfitPercentForSearch(): number {
   return 3; // النسبة الافتراضية
 }
 
-// دالة قراءة رصيد USDT
-function getUSDTBalance(): number {
+// دالة قراءة رصيد USDT - تستخدم الدالة المركزية من binanceTrading
+async function getUSDTBalanceLive(): Promise<number> {
   try {
-    // 1. أولاً: من بيانات المحفظة المحفوظة
-    const portfolioData = localStorage.getItem('binance_portfolio_data');
-    if (portfolioData) {
-      const data = JSON.parse(portfolioData);
-      if (data.balances) {
-        const usdtAsset = data.balances.find((b: any) => 
-          b.asset?.toUpperCase() === 'USDT'
-        );
-        if (usdtAsset) {
-          const balance = parseFloat(usdtAsset.free || usdtAsset.total || usdtAsset.usdValue || '0');
-          console.log('💰 رصيد USDT من portfolio_data:', balance);
-          if (balance > 0) return balance;
-        }
-      }
-    }
-
-    // 2. من القيمة الإجمالية المحفوظة
-    const totalValue = localStorage.getItem('binance_total_value');
-    if (totalValue) {
-      const balance = parseFloat(totalValue);
-      console.log('💰 رصيد USDT من total_value:', balance);
-      if (balance > 0) return balance;
-    }
-
-    // 3. من بيانات الأصول المحفوظة (نبحث عن قيمة USDT)
-    const savedAssets = localStorage.getItem('binance_portfolio_assets');
-    if (savedAssets) {
-      try {
-        const assets = JSON.parse(savedAssets);
-        // البحث عن USDT في المصفوفة
-        const usdtData = assets.find((a: any) => 
-          (typeof a === 'string' && a === 'USDT') ||
-          (a?.asset === 'USDT') ||
-          (a?.symbol === 'USDT')
-        );
-        if (usdtData && typeof usdtData === 'object') {
-          const balance = parseFloat(usdtData.usdValue || usdtData.total || usdtData.free || '0');
-          if (balance > 0) return balance;
-        }
-      } catch (e) {
-        console.error('خطأ في قراءة الأصول:', e);
-      }
-    }
-
-    // 4. القيمة الافتراضية
-    console.log('⚠️ لم يتم العثور على رصيد USDT');
-    return 0;
+    // استخدام الدالة المركزية التي تجلب من API وتحفظ تلقائياً
+    return await getUSDTBalance();
   } catch (error) {
-    console.error('❌ خطأ في قراءة رصيد USDT:', error);
-    return 0;
+    console.log('⚠️ فشل جلب الرصيد من API، استخدام الكاش...');
+    return getCachedUSDTBalance();
   }
+}
+
+// دالة متزامنة للقراءة السريعة من الكاش
+function getUSDTBalanceFromCache(): number {
+  return getCachedUSDTBalance();
 }
 
 // دالة حساب عدد العملات في المحفظة (غير USDT)
@@ -541,7 +501,9 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
     addLog('info', '🚀 بدء دورة بحث جديدة');
     
     try {
-      const usdtBalance = getUSDTBalance();
+      // جلب الرصيد مباشرة من Binance API
+      addLog('info', '💰 جاري جلب رصيد USDT من Binance...');
+      const usdtBalance = await getUSDTBalanceLive();
       addLog('info', `💰 رصيد USDT: $${usdtBalance.toFixed(2)}`);
       
       // 🎯 التحقق من شروط التداول الذكي

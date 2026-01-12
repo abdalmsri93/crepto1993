@@ -18,6 +18,8 @@ interface ConvertRequest {
   fromAsset: string;  // USDT
   toAsset: string;    // BTC, ETH, etc.
   fromAmount: number; // المبلغ بـ USDT
+  useMargin?: boolean;  // استخدام الرافعة المالية
+  leverage?: number;    // مستوى الرافعة (2, 3, 5, 10)
 }
 
 /**
@@ -195,6 +197,107 @@ async function executeMarketBuy(
 }
 
 /**
+ * تنفيذ شراء بالرافعة المالية (Isolated Margin)
+ */
+async function executeMarginBuy(
+  apiKey: string,
+  secretKey: string,
+  symbol: string,
+  amount: number,
+  leverage: number
+): Promise<any> {
+  const effectiveAmount = amount * leverage;
+  console.log(`⚡ Margin Buy: ${symbol} - Amount: $${amount} - Leverage: ${leverage}x - Effective: $${effectiveAmount}`);
+
+  // Step 1: Transfer USDT to Isolated Margin
+  console.log('📤 Step 1: Transferring to Isolated Margin...');
+  const transferTimestamp = Date.now();
+  const transferParams = `asset=USDT&symbol=${symbol}&amount=${amount}&transFrom=SPOT&transTo=ISOLATED_MARGIN&timestamp=${transferTimestamp}`;
+  const transferSig = await createSignature(transferParams, secretKey);
+
+  const transferResponse = await fetch(
+    `${BINANCE_API_BASE}/sapi/v1/margin/isolated/transfer?${transferParams}&signature=${transferSig}`,
+    {
+      method: 'POST',
+      headers: { 'X-MBX-APIKEY': apiKey },
+    }
+  );
+
+  if (!transferResponse.ok) {
+    const error = await transferResponse.json();
+    console.error('❌ Transfer failed:', error);
+    if (error.code === -11001 || error.msg?.includes('not exist')) {
+      throw new Error('Margin not supported for this pair');
+    }
+    throw new Error(error.msg || 'Transfer failed');
+  }
+  console.log('✅ Transfer successful');
+
+  // Step 2: Borrow additional amount
+  const borrowAmount = amount * (leverage - 1);
+  if (borrowAmount > 0) {
+    console.log(`💰 Step 2: Borrowing $${borrowAmount}...`);
+    const borrowTimestamp = Date.now();
+    const borrowParams = `asset=USDT&amount=${borrowAmount}&isIsolated=TRUE&symbol=${symbol}&timestamp=${borrowTimestamp}`;
+    const borrowSig = await createSignature(borrowParams, secretKey);
+
+    const borrowResponse = await fetch(
+      `${BINANCE_API_BASE}/sapi/v1/margin/loan?${borrowParams}&signature=${borrowSig}`,
+      {
+        method: 'POST',
+        headers: { 'X-MBX-APIKEY': apiKey },
+      }
+    );
+
+    if (!borrowResponse.ok) {
+      const error = await borrowResponse.json();
+      console.error('❌ Borrow failed:', error);
+      
+      // Rollback: Transfer back to SPOT
+      const rollbackTimestamp = Date.now();
+      const rollbackParams = `asset=USDT&symbol=${symbol}&amount=${amount}&transFrom=ISOLATED_MARGIN&transTo=SPOT&timestamp=${rollbackTimestamp}`;
+      const rollbackSig = await createSignature(rollbackParams, secretKey);
+      await fetch(
+        `${BINANCE_API_BASE}/sapi/v1/margin/isolated/transfer?${rollbackParams}&signature=${rollbackSig}`,
+        { method: 'POST', headers: { 'X-MBX-APIKEY': apiKey } }
+      );
+      
+      throw new Error(error.msg || 'Borrow failed');
+    }
+    console.log('✅ Borrow successful');
+  }
+
+  // Step 3: Execute Margin Market Buy Order
+  console.log(`📊 Step 3: Executing margin buy order for $${effectiveAmount}...`);
+  const orderTimestamp = Date.now();
+  const orderParams = `symbol=${symbol}&side=BUY&type=MARKET&quoteOrderQty=${effectiveAmount}&isIsolated=TRUE&timestamp=${orderTimestamp}`;
+  const orderSig = await createSignature(orderParams, secretKey);
+
+  const orderResponse = await fetch(
+    `${BINANCE_API_BASE}/sapi/v1/margin/order?${orderParams}&signature=${orderSig}`,
+    {
+      method: 'POST',
+      headers: { 'X-MBX-APIKEY': apiKey },
+    }
+  );
+
+  const orderData = await orderResponse.json();
+  if (!orderResponse.ok) {
+    console.error('❌ Margin order failed:', orderData);
+    throw new Error(orderData.msg || 'Margin order failed');
+  }
+
+  console.log('✅ Margin order successful:', orderData);
+  return {
+    ...orderData,
+    isMargin: true,
+    leverage,
+    originalAmount: amount,
+    effectiveAmount,
+  };
+}
+
+/**
  * الدالة الرئيسية
  */
 Deno.serve(async (req: Request) => {
@@ -265,13 +368,39 @@ Deno.serve(async (req: Request) => {
 
     console.log(`📊 Symbol info:`, symbolInfo);
 
-    // تنفيذ الشراء
-    const orderResult = await executeMarketBuy(
-      requestData.apiKey,
-      requestData.secretKey,
-      symbol,
-      requestData.fromAmount
-    );
+    // تحديد نوع الشراء (Margin أو Spot)
+    let orderResult;
+    
+    if (requestData.useMargin && requestData.leverage && requestData.leverage > 1) {
+      // شراء بالرافعة المالية
+      console.log(`⚡ Using Margin Trading with ${requestData.leverage}x leverage`);
+      try {
+        orderResult = await executeMarginBuy(
+          requestData.apiKey,
+          requestData.secretKey,
+          symbol,
+          requestData.fromAmount,
+          requestData.leverage
+        );
+      } catch (marginError: any) {
+        console.log(`⚠️ Margin failed: ${marginError.message}, falling back to Spot...`);
+        // Fallback to Spot if Margin fails
+        orderResult = await executeMarketBuy(
+          requestData.apiKey,
+          requestData.secretKey,
+          symbol,
+          requestData.fromAmount
+        );
+      }
+    } else {
+      // شراء Spot عادي
+      orderResult = await executeMarketBuy(
+        requestData.apiKey,
+        requestData.secretKey,
+        symbol,
+        requestData.fromAmount
+      );
+    }
 
     // حساب السعر المتوسط
     const executedQty = parseFloat(orderResult.executedQty);
@@ -289,6 +418,10 @@ Deno.serve(async (req: Request) => {
         fromAmount: orderResult.cummulativeQuoteQty,
         inversePrice: avgPrice.toFixed(8),
         status: orderResult.status,
+        isMargin: orderResult.isMargin || false,
+        leverage: orderResult.leverage || 1,
+        originalAmount: orderResult.originalAmount || requestData.fromAmount,
+        effectiveAmount: orderResult.effectiveAmount || requestData.fromAmount,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
