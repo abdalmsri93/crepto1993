@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { PortfolioHeader } from "@/components/PortfolioHeader";
@@ -6,12 +6,13 @@ import { AssetCard } from "@/components/AssetCard";
 import { PortfolioAnalysis } from "@/components/PortfolioAnalysis";
 import { AutoSearchPanel } from "@/components/AutoSearchPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X, Play, Square } from "lucide-react";
+import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X, Play, Square, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/NavLink";
 import { useAutoSearch } from "@/contexts/AutoSearchContext";
 import { assignProfitPercentsToExistingCoins } from "@/services/smartTradingService";
 import { addBuyRecord, getTradeHistory } from "@/services/tradeHistory";
+import { DUST_THRESHOLD } from "@/services/investmentBackupService";
 import type { Session } from "@supabase/supabase-js";
 
 interface Balance {
@@ -40,13 +41,62 @@ const Index = () => {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'testing' | 'unknown'>('unknown');
   const [showAutoSearch, setShowAutoSearch] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   
   // 🔄 استخدام البحث التلقائي
   const { isRunning, startAutoSearch, stopAutoSearch } = useAutoSearch();
 
-  // 🚀 تشغيل البحث التلقائي عند فتح الموقع
+  // � التحقق من صلاحية مفتاح Groq API
+  useEffect(() => {
+    const checkGroqApiKey = async () => {
+      const apiKey = localStorage.getItem('groq_api_key');
+      
+      if (!apiKey || apiKey.trim() === '') {
+        setApiKeyError('مفتاح Groq AI غير موجود - التحليل الذكي لن يعمل');
+        return;
+      }
+      
+      try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey.trim()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'user', content: 'test' }],
+            max_tokens: 5,
+          }),
+        });
+        
+        if (response.status === 401) {
+          setApiKeyError('مفتاح Groq AI غير صالح أو منتهي الصلاحية');
+          console.error('❌ Groq API Key invalid (401)');
+        } else if (response.status === 429) {
+          // Rate limit - المفتاح صالح لكن تجاوز الحد
+          setApiKeyError(null);
+          console.log('⚠️ Groq API rate limited but key is valid');
+        } else if (response.ok) {
+          setApiKeyError(null);
+          console.log('✅ Groq API Key is valid');
+        } else {
+          const errorText = await response.text();
+          console.error('❌ Groq API Error:', response.status, errorText);
+          setApiKeyError(`خطأ في Groq API: ${response.status}`);
+        }
+      } catch (error) {
+        console.error('Error checking Groq API:', error);
+        // لا نعرض خطأ إذا كان مشكلة اتصال فقط
+      }
+    };
+    
+    checkGroqApiKey();
+  }, []);
+
+  // �🚀 تشغيل البحث التلقائي عند فتح الموقع
   useEffect(() => {
     if (!isRunning) {
       console.log('🚀 تشغيل البحث التلقائي تلقائياً عند فتح الموقع...');
@@ -311,6 +361,32 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 animate-fade-in">
       <div className="max-w-7xl mx-auto">
+        {/* ⚠️ تحذير مفتاح API */}
+        {apiKeyError && (
+          <div className="mb-4 p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-6 h-6 text-yellow-500 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-yellow-500">⚠️ تحذير: {apiKeyError}</p>
+                <p className="text-sm text-muted-foreground">ChatGPT و Gemini لن يعملان - أنشئ مفتاح جديد من Groq</p>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">
+                <Button variant="default" size="sm" className="bg-green-600 hover:bg-green-700 whitespace-nowrap">
+                  🔑 إنشاء مفتاح جديد
+                </Button>
+              </a>
+              <NavLink to="/settings">
+                <Button variant="outline" size="sm" className="border-yellow-500/50 hover:bg-yellow-500/20 whitespace-nowrap">
+                  <SettingsIcon className="w-4 h-4 mr-2" />
+                  الإعدادات
+                </Button>
+              </NavLink>
+            </div>
+          </div>
+        )}
+
         <div className="mb-6 flex justify-between items-center gap-4 animate-fade-in flex-wrap animate-delay-100">
           <div className="flex gap-2">
             <NavLink to="/settings">
@@ -406,36 +482,53 @@ const Index = () => {
               <PortfolioAnalysis balances={portfolio.balances} session={session} />
             </div>
 
-            <div className="mb-6">
-              <h2 className="text-xl font-orbitron font-semibold mb-4 text-foreground">
-                الأصول ({portfolio.balances.length})
-              </h2>
-            </div>
+            {/* 🔍 فلترة العملات - إخفاء الغبار (أقل من $1) */}
+            {(() => {
+              const filteredBalances = portfolio.balances.filter(
+                balance => parseFloat(balance.usdValue) >= DUST_THRESHOLD
+              );
+              const dustCount = portfolio.balances.length - filteredBalances.length;
+              
+              return (
+                <>
+                  <div className="mb-6">
+                    <h2 className="text-xl font-orbitron font-semibold mb-2 text-foreground">
+                      الأصول ({filteredBalances.length})
+                    </h2>
+                    {dustCount > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        🧹 تم إخفاء {dustCount} عملة غبار (قيمة أقل من ${DUST_THRESHOLD})
+                      </p>
+                    )}
+                  </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {portfolio.balances.map((balance, index) => (
-                <div 
-                  key={balance.asset}
-                  style={{ 
-                    animationDelay: `${index * 0.1}s`,
-                  }}
-                >
-                  <AssetCard
-                    asset={balance.asset}
-                    total={balance.total}
-                    usdValue={balance.usdValue}
-                    priceChangePercent={balance.priceChangePercent}
-                    currentPrice={balance.currentPrice}
-                  />
-                </div>
-              ))}
-            </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredBalances.map((balance, index) => (
+                      <div 
+                        key={balance.asset}
+                        style={{ 
+                          animationDelay: `${index * 0.1}s`,
+                        }}
+                      >
+                        <AssetCard
+                          asset={balance.asset}
+                          total={balance.total}
+                          usdValue={balance.usdValue}
+                          priceChangePercent={balance.priceChangePercent}
+                          currentPrice={balance.currentPrice}
+                        />
+                      </div>
+                    ))}
+                  </div>
 
-            {portfolio.balances.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">لا توجد أصول في المحفظة</p>
-              </div>
-            )}
+                  {filteredBalances.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">لا توجد أصول في المحفظة</p>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </>
         )}
       </div>
