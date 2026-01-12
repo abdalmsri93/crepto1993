@@ -419,6 +419,28 @@ function addToFavorites(coin: SearchCoin): boolean {
   }
 }
 
+// إزالة من المفضلات
+function removeFromFavorites(symbol: string): boolean {
+  try {
+    const saved = localStorage.getItem(FAVORITES_KEY);
+    if (!saved) return false;
+    
+    let favorites: SearchCoin[] = JSON.parse(saved);
+    const initialLength = favorites.length;
+    favorites = favorites.filter(f => f.symbol !== symbol);
+    
+    if (favorites.length < initialLength) {
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+      console.log(`🗑️ تمت إزالة ${symbol} من المفضلات`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('❌ خطأ في إزالة من المفضلات:', error);
+    return false;
+  }
+}
+
 // التحقق من موافقة كلا AI
 function bothAIRecommendBuy(analysis: DualAnalysis): boolean {
   return analysis.chatgpt.recommended === true && analysis.gemini.recommended === true;
@@ -500,6 +522,15 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
     setStatus(prev => ({ ...prev, isSearching: true, error: null }));
     addLog('info', '🚀 بدء دورة بحث جديدة');
     
+    // 📋 طباعة جميع الإعدادات للتشخيص
+    const credentials = hasCredentials();
+    const groqKey = localStorage.getItem('groq_api_key');
+    console.log('🔧 إعدادات النظام:', {
+      hasCredentials: credentials,
+      hasGroqKey: !!groqKey,
+      groqKeyLength: groqKey?.length || 0
+    });
+    
     try {
       // جلب الرصيد مباشرة من Binance API
       addLog('info', '💰 جاري جلب رصيد USDT من Binance...');
@@ -509,6 +540,15 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       // 🎯 التحقق من شروط التداول الذكي
       const smartSettings = getSmartTradingSettings();
       const smartState = getSmartTradingState();
+      
+      // طباعة الإعدادات للتتبع
+      console.log('📊 إعدادات التداول الذكي:', {
+        enabled: smartSettings.enabled,
+        buyAmount: smartSettings.buyAmount,
+        maxPortfolioCoins: smartSettings.maxPortfolioCoins,
+        currentCycle: smartState.currentCycle,
+        currentProfitPercent: smartState.currentProfitPercent
+      });
       
       if (smartSettings.enabled) {
         addLog('info', `🎯 نظام التداول الذكي مفعّل - الدورة ${smartState.currentCycle} - النسبة ${smartState.currentProfitPercent}%`);
@@ -595,42 +635,68 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
           const geminiResult = analysis.gemini.recommended ? '✅ نعم' : '❌ لا';
           addLog('info', `  ChatGPT: ${chatgptResult} | Gemini: ${geminiResult}`, coin.symbol);
           
-          // شرط الإضافة: كلاهما أو أحدهما (حسب الإعداد)
+          // شرط الإضافة: أحدهما على الأقل (معدّل ليكون أقل صرامة)
           const bothRecommend = analysis.chatgpt.recommended && analysis.gemini.recommended;
           const atLeastOne = analysis.chatgpt.recommended || analysis.gemini.recommended;
           
-          // استخدام شرط "أحدهما على الأقل" إذا لم يكن هناك API Key
-          // أو "كلاهما" إذا كان هناك API Key
-          const shouldAdd = hasApiKey ? bothRecommend : atLeastOne;
+          // قبول رأي واحد على الأقل من أي AI
+          const shouldAdd = atLeastOne;
+          
+          addLog('info', `📊 نتيجة التحليل: bothRecommend=${bothRecommend}, atLeastOne=${atLeastOne}, shouldAdd=${shouldAdd}`, coin.symbol);
           
           if (shouldAdd) {
             const reason = bothRecommend ? 'كلاهما ينصح!' : 'أحدهما ينصح';
             addLog('success', `✨ ${reason}`, coin.symbol);
             
+            addLog('info', `📝 محاولة إضافة ${coin.symbol} للمفضلات...`, coin.symbol);
             if (addToFavorites(coin)) {
               addedInCycle++;
               addLog('success', `⭐ تمت الإضافة للمفضلات`, coin.symbol);
               
+              // 🎯 التحقق من إمكانية الشراء التلقائي
+              addLog('info', `🔍 فحص شروط الشراء التلقائي...`, coin.symbol);
+              addLog('info', `  - التداول الذكي مفعّل: ${smartSettings.enabled ? '✅' : '❌'}`, coin.symbol);
+              addLog('info', `  - يوجد API Keys: ${hasCredentials() ? '✅' : '❌'}`, coin.symbol);
+              
               // 🎯 تنفيذ الشراء الفعلي
               if (smartSettings.enabled && hasCredentials()) {
                 const buyAmount = smartSettings.buyAmount;
+                addLog('info', `💰 مبلغ الشراء المحدد: $${buyAmount}`, coin.symbol);
+                let buySuccess = false;
                 
                 // ⚡ جلب الرصيد الحقيقي قبل الشراء مباشرة
                 try {
+                  addLog('info', `📡 جلب رصيد USDT من Binance API...`, coin.symbol);
                   const currentBalance = await getUSDTBalance();
+                  addLog('info', `💰 رصيد USDT من API: $${currentBalance.toFixed(2)}`, coin.symbol);
+                  
                   if (currentBalance < buyAmount) {
-                    addLog('warning', `⛔ الرصيد غير كافي للشراء! متوفر: $${currentBalance.toFixed(2)} - مطلوب: $${buyAmount}`, coin.symbol);
+                    addLog('error', `⛔ الرصيد غير كافي! متوفر: $${currentBalance.toFixed(2)} - مطلوب: $${buyAmount}`, coin.symbol);
+                    // إزالة من المفضلات لأن الرصيد غير كافٍ
+                    removeFromFavorites(coin.symbol);
+                    addedInCycle--;
                     continue;
                   }
-                  addLog('info', `💰 رصيد USDT الحالي: $${currentBalance.toFixed(2)} - جاري شراء $${buyAmount} من ${coin.symbol}...`, coin.symbol);
-                } catch (balanceError) {
-                  addLog('warning', `⚠️ فشل التحقق من الرصيد - متابعة الشراء...`, coin.symbol);
+                  
+                  addLog('info', `✅ الرصيد كافي - المتابعة للشراء`, coin.symbol);
+                  addLog('info', `💳 جاري شراء $${buyAmount} من ${coin.symbol}...`, coin.symbol);
+                } catch (balanceError: any) {
+                  addLog('error', `❌ فشل جلب الرصيد: ${balanceError.message}`, coin.symbol);
+                  console.error('Balance Error Details:', balanceError);
+                  // إزالة من المفضلات لأننا لا نستطيع التحقق من الرصيد
+                  removeFromFavorites(coin.symbol);
+                  addedInCycle--;
+                  continue;
                 }
                 
                 try {
+                  addLog('info', `📤 إرسال أمر الشراء إلى Binance...`, coin.symbol);
                   const buyResult = await buyWithAmount(coin.symbol, buyAmount);
                   
+                  addLog('info', `📥 استجابة Binance: ${buyResult.success ? 'نجح' : 'فشل'}`, coin.symbol);
+                  
                   if (buyResult.success) {
+                    buySuccess = true;
                     addLog('success', `✅ تم الشراء! الكمية: ${buyResult.executedQty}`, coin.symbol);
                     
                     // 📜 تسجيل عملية الشراء في السجل
@@ -651,15 +717,26 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
                     localStorage.setItem(`investment_${coin.symbol}`, String(buyAmount));
                   } else {
                     addLog('error', `❌ فشل الشراء: ${buyResult.error}`, coin.symbol);
-                    // إزالة من المفضلات إذا فشل الشراء
-                    addedInCycle--;
+                    console.error('Buy Error Details:', buyResult);
                   }
                 } catch (buyError: any) {
                   addLog('error', `❌ خطأ في الشراء: ${buyError.message}`, coin.symbol);
-                  addedInCycle--;
+                  console.error('Buy Exception:', buyError);
                 }
-              } else if (!hasCredentials()) {
-                addLog('warning', `⚠️ لا يوجد API Keys - لم يتم الشراء`, coin.symbol);
+                
+                // إذا فشل الشراء، أزل من المفضلات
+                if (!buySuccess) {
+                  removeFromFavorites(coin.symbol);
+                  addedInCycle--;
+                  addLog('warning', `🗑️ تمت إزالة ${coin.symbol} من المفضلات (فشل الشراء)`, coin.symbol);
+                }
+              } else {
+                // شرح سبب عدم الشراء
+                if (!smartSettings.enabled) {
+                  addLog('warning', `⚠️ التداول الذكي معطّل - لم يتم الشراء`, coin.symbol);
+                } else if (!hasCredentials()) {
+                  addLog('warning', `⚠️ لا يوجد API Keys - لم يتم الشراء`, coin.symbol);
+                }
               }
             } else {
               skippedInCycle++;
@@ -667,7 +744,7 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
             }
           } else {
             skippedInCycle++;
-            addLog('info', `❌ لم يتفقا على التوصية`, coin.symbol);
+            addLog('warning', `❌ لم ينصح أي AI - ChatGPT: ${chatgptResult}, Gemini: ${geminiResult}`, coin.symbol);
           }
           
           await new Promise(resolve => setTimeout(resolve, 2000));

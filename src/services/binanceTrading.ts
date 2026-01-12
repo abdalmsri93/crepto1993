@@ -413,8 +413,9 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
 // Trading Functions
 // ==============================
 
-// Supabase URL
+// Supabase Configuration
 const SUPABASE_URL = 'https://dpxuacnrncwyopehwxsj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRweHVhY25ybmN3eW9wZWh3eHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQyODUyNjIsImV4cCI6MjA0OTg2MTI2Mn0.cN5y3IvxZmE4aB0FXiWsN3h1sQT_m_OscmQCBtF7aXY';
 
 /**
  * إنشاء توقيع HMAC-SHA256 للمتصفح
@@ -467,6 +468,18 @@ export async function buyWithAmount(
       };
     }
 
+    // 💰 جلب الرصيد الحقيقي من API قبل الشراء
+    console.log('💰 جلب رصيد USDT الحقيقي من API...');
+    const realBalance = await getUSDTBalance();
+    console.log(`💵 رصيد USDT الحقيقي: $${realBalance}`);
+    
+    if (realBalance < usdtAmount) {
+      return {
+        success: false,
+        error: `رصيد USDT غير كافٍ. المتاح: $${realBalance.toFixed(2)}، المطلوب: $${usdtAmount}`,
+      };
+    }
+
     console.log('📤 إرسال أمر الشراء إلى Binance...');
 
     // إرسال الطلب مباشرة للـ Edge Function
@@ -474,6 +487,7 @@ export async function buyWithAmount(
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify({
         apiKey: credentials.apiKey,
