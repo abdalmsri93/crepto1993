@@ -4,6 +4,8 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { backupCoinInvestment } from './investmentBackupService';
+import { getCoinTargetProfit, saveCoinTargetProfit } from './smartTradingService';
 
 // ==============================
 // Types & Interfaces
@@ -466,6 +468,11 @@ export async function buyWithAmount(
       status: 'FILLED',
       timestamp: Date.now(),
     });
+
+    // 🔒 حفظ بيانات الاستثمار في النسخة الاحتياطية
+    const targetProfit = getCoinTargetProfit(cleanSymbol);
+    backupCoinInvestment(cleanSymbol, usdtAmount, targetProfit);
+    console.log(`💾 تم حفظ بيانات استثمار ${cleanSymbol}: $${usdtAmount}, ربح ${targetProfit}%`);
 
     return {
       success: true,

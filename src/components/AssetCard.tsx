@@ -10,8 +10,9 @@ import {
   getSmartTradingSettings, 
   registerSell, 
   getCurrentProfitPercent,
-  getCoinTargetProfit 
+  getCoinTargetProfit
 } from "@/services/smartTradingService";
+import { getCoinInvestment, removeCoinInvestment, isCoinSold, isDustCoin, DUST_THRESHOLD } from "@/services/investmentBackupService";
 
 interface AssetCardProps {
   asset: string;
@@ -59,9 +60,11 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const [boostAmount, setBoostAmount] = useState<string>("");
   const [totalBoost, setTotalBoost] = useState<number>(0);
   
-  // 💵 حالة مبلغ الاستثمار الأصلي
-  const [investmentAmount, setInvestmentAmount] = useState<string>("");
+  // 💵 حالة مبلغ الاستثمار الأصلي (للقراءة فقط - يتم جلبه تلقائياً)
   const [savedInvestment, setSavedInvestment] = useState<number>(0);
+  
+  // 🎯 نسبة الربح المستهدفة (للقراءة فقط)
+  const [savedTargetProfit, setSavedTargetProfit] = useState<number>(0);
   
   // 📂 حالة طي/توسيع البطاقة (مطوية بشكل افتراضي دائماً)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
@@ -71,30 +74,40 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const autoSellTriggeredRef = useRef<boolean>(false);
   const [checkCounter, setCheckCounter] = useState<number>(0); // لإجبار الفحص الدوري
   
-  // تحميل مبلغ التعزيز المحفوظ عند التحميل
+  // � التحقق إذا كانت العملة مباعة أو غبار
+  const currentValue = parseFloat(usdValue);
+  const isSoldOrDust = isCoinSold(asset) || isDustCoin(currentValue);
+  
+  // 🔄 تحميل البيانات من النسخة الاحتياطية عند التحميل
   useEffect(() => {
+    // ❌ لا نحمل بيانات العملات المباعة أو الغبار
+    if (isSoldOrDust) {
+      setSavedInvestment(0);
+      setSavedTargetProfit(0);
+      setTotalBoost(0);
+      return;
+    }
+    
+    // تحميل مبلغ التعزيز
     const savedBoost = localStorage.getItem(`boost_${asset}`);
     if (savedBoost) {
       setTotalBoost(parseFloat(savedBoost));
     }
     
-    // تحميل مبلغ الاستثمار المحفوظ
-    const savedInv = localStorage.getItem(`investment_${asset}`);
-    if (savedInv) {
-      setSavedInvestment(parseFloat(savedInv));
-    } else {
-      // 💰 للعملات القديمة: إذا كانت قيمتها > $3 ولا يوجد استثمار محفوظ
-      // نجلب المبلغ من إعدادات الشراء التلقائي
-      const currentValue = parseFloat(usdValue);
-      if (currentValue > 3 && asset !== 'USDT') {
-        const autoBuyAmount = localStorage.getItem('binance_auto_buy_amount');
-        const defaultInvestment = autoBuyAmount ? parseFloat(autoBuyAmount) : 5;
-        setSavedInvestment(defaultInvestment);
-        localStorage.setItem(`investment_${asset}`, defaultInvestment.toString());
-        console.log(`💰 تم تعيين استثمار $${defaultInvestment} للعملة ${asset}`);
+    // 🔒 تحميل بيانات الاستثمار من النسخة الاحتياطية (أو localStorage)
+    if (asset !== 'USDT') {
+      const coinData = getCoinInvestment(asset);
+      if (coinData) {
+        setSavedInvestment(coinData.investment);
+        setSavedTargetProfit(coinData.targetProfit);
+        console.log(`✅ تم تحميل بيانات ${asset}: $${coinData.investment}, ${coinData.targetProfit}%`);
+      } else {
+        // للعملات الجديدة بدون بيانات
+        setSavedInvestment(0);
+        setSavedTargetProfit(getCoinTargetProfit(asset));
       }
     }
-  }, [asset, usdValue]);
+  }, [asset, isSoldOrDust]);
   
   // ⏰ فحص دوري كل 30 ثانية لضمان عمل البيع التلقائي
   useEffect(() => {
@@ -174,9 +187,10 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
             }));
           }
           
-          // مسح مبلغ الاستثمار بعد البيع
-          localStorage.removeItem(`investment_${asset}`);
+          // 🗑️ مسح بيانات الاستثمار بعد البيع الناجح فقط (مع تسجيل كعملة مباعة)
+          removeCoinInvestment(asset, true, soldTotal, profit);
           setSavedInvestment(0);
+          setSavedTargetProfit(0);
         } else {
           toast({
             title: `❌ فشل بيع ${asset}`,
@@ -221,25 +235,7 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     localStorage.removeItem(`boost_${asset}`);
   };
   
-  // 💵 حفظ مبلغ الاستثمار الأصلي
-  const handleSaveInvestment = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const amount = parseFloat(investmentAmount);
-    if (amount > 0) {
-      setSavedInvestment(amount);
-      localStorage.setItem(`investment_${asset}`, amount.toString());
-      setInvestmentAmount("");
-    }
-  };
-  
-  // إعادة تعيين مبلغ الاستثمار
-  const handleResetInvestment = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSavedInvestment(0);
-    localStorage.removeItem(`investment_${asset}`);
-  };
-  
-  // 📂 تبديل حالة الطي/التوسيع
+  //  تبديل حالة الطي/التوسيع
   const handleToggleCollapse = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsCollapsed(!isCollapsed);
@@ -309,7 +305,21 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
           </div>
           
           {/* 💎 قسم المجموع الكلي - يظهر دائماً */}
-          {(savedInvestment > 0 || totalBoost > 0) && (
+          {isSoldOrDust && asset !== 'USDT' ? (
+            <div className="p-3 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 rounded-lg border border-amber-500/30">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5 text-amber-400 text-sm font-semibold">
+                  {isCoinSold(asset) ? '✅ عملة مباعة' : '🧹 غبار'}
+                </div>
+                <span className="font-orbitron text-amber-400 font-bold text-lg">
+                  ${currentValue.toFixed(2)}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground/60 mt-1 text-right">
+                {isCoinSold(asset) ? 'تم البيع بنجاح سابقاً' : `قيمة أقل من $${DUST_THRESHOLD}`}
+              </p>
+            </div>
+          ) : (savedInvestment > 0 || totalBoost > 0) ? (
             <div className="p-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1.5 text-purple-400 text-sm font-semibold">
@@ -324,10 +334,25 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                 الاستثمار + التعزيزات
               </p>
             </div>
+          ) : asset !== 'USDT' && (
+            <div className="p-3 bg-gradient-to-r from-gray-500/10 to-slate-500/10 rounded-lg border border-gray-500/30">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5 text-gray-400 text-sm font-semibold">
+                  <DollarSign className="w-4 h-4" />
+                  المجموع الكلي
+                </div>
+                <span className="font-orbitron text-gray-400 font-bold text-xl">
+                  $0
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground/60 mt-1 text-right">
+                لم يتم تحديد استثمار
+              </p>
+            </div>
           )}
           
-          {/* 🎯 قسم نسبة البيع والهدف */}
-          {savedInvestment > 0 && asset !== 'USDT' && (
+          {/* 🎯 قسم نسبة البيع والهدف - لا يظهر للعملات المباعة/الغبار */}
+          {!isSoldOrDust && savedInvestment > 0 && asset !== 'USDT' ? (
             <div className="p-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/30">
               <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-1.5 text-green-400 text-sm font-semibold">
@@ -343,6 +368,25 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                 </div>
                 <span className="font-orbitron text-emerald-400 font-bold text-lg">
                   ${((savedInvestment + totalBoost) * (1 + getCoinTargetProfit(asset) / 100)).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          ) : !isSoldOrDust && asset !== 'USDT' && (
+            <div className="p-3 bg-gradient-to-r from-gray-500/10 to-slate-500/10 rounded-lg border border-gray-500/30">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-1.5 text-gray-400 text-sm font-semibold">
+                  🎯 نسبة البيع
+                </div>
+                <span className="font-orbitron text-gray-400 font-bold text-lg">
+                  --
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5 text-gray-400 text-sm font-semibold">
+                  💰 الهدف
+                </div>
+                <span className="font-orbitron text-gray-400 font-bold text-lg">
+                  --
                 </span>
               </div>
             </div>
@@ -407,49 +451,42 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                 </>
               )}
               
-              {/* 💵 قسم مبلغ الاستثمار الأصلي */}
+              {/* 💵 قسم مبلغ الاستثمار الأصلي - للقراءة فقط */}
               <div className="mt-3 p-3 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-lg border border-blue-500/30">
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex justify-between items-center">
                   <div className="flex items-center gap-1.5 text-blue-400 text-sm font-semibold">
                     <Wallet className="w-4 h-4" />
                     مبلغ الاستثمار
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-orbitron text-blue-400 font-bold text-lg">
-                      ${savedInvestment.toLocaleString()}
-                    </span>
-                    {savedInvestment > 0 && (
-                      <button
-                        onClick={handleResetInvestment}
-                        className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                        title="إعادة تعيين"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
+                  <span className="font-orbitron text-blue-400 font-bold text-lg">
+                    ${savedInvestment.toLocaleString()}
+                  </span>
                 </div>
-                
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={investmentAmount}
-                    onChange={(e) => setInvestmentAmount(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    placeholder="أدخل المبلغ..."
-                    className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-blue-500/30 focus:border-blue-500 focus:outline-none text-right"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleSaveInvestment}
-                    disabled={!investmentAmount || parseFloat(investmentAmount) <= 0}
-                    className="bg-blue-500 hover:bg-blue-600 text-white gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    حفظ
-                  </Button>
-                </div>
+                {savedInvestment === 0 && (
+                  <p className="text-xs text-muted-foreground/60 mt-1 text-right">
+                    🔒 يتم تحديده تلقائياً عند الشراء
+                  </p>
+                )}
               </div>
+              
+              {/* 🎯 قسم نسبة الربح - للقراءة فقط */}
+              {asset !== 'USDT' && (
+                <div className="mt-3 p-3 bg-gradient-to-r from-orange-500/10 to-amber-500/10 rounded-lg border border-orange-500/30">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5 text-orange-400 text-sm font-semibold">
+                      🎯 نسبة الربح المستهدفة
+                    </div>
+                    <span className="font-orbitron text-orange-400 font-bold text-lg">
+                      {savedTargetProfit > 0 ? `${savedTargetProfit}%` : '--'}
+                    </span>
+                  </div>
+                  {savedTargetProfit === 0 && (
+                    <p className="text-xs text-muted-foreground/60 mt-1 text-right">
+                      🔒 يتم تحديدها تلقائياً عند الشراء
+                    </p>
+                  )}
+                </div>
+              )}
               
               {/* 💰 قسم مبلغ التعزيز */}
               <div className="mt-3 p-3 bg-gradient-to-r from-emerald-500/10 to-green-500/10 rounded-lg border border-emerald-500/30">
