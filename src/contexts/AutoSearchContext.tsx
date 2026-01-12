@@ -73,6 +73,25 @@ const PRICE_RANGE_BY_PROFIT: { [key: number]: number } = {
   15: 0.20,   // نسبة 15% → سعر حتى $0.20
 };
 
+// 🚫 القائمة السوداء - عملات تجنبها (مشاكل سابقة أو stablecoins)
+const BLACKLIST: string[] = [
+  'LUNA', 'LUNC', 'UST', 'USTC',  // انهيار Terra
+  'FTT', 'SRM',                     // انهيار FTX
+  'BUSD', 'TUSD', 'PAX', 'USDP', 'GUSD', 'DAI', 'USDC', 'FDUSD', // Stablecoins
+  'WBTC', 'WETH', 'STETH',         // Wrapped tokens
+];
+
+// 📊 حدود تغير السعر 24 ساعة
+const PRICE_CHANGE_LIMITS = {
+  MIN: -10,    // الحد الأدنى: -10% (تجنب الانهيار)
+  MAX: 3,      // الحد الأقصى: +3% (تجنب الشراء بعد الارتفاع)
+  PUMP: 15,    // رفض Pump: > +15%
+  DUMP: -15,   // رفض Dump: < -15%
+};
+
+// 💰 الحد الأدنى لحجم التداول
+const MIN_VOLUME = 100000; // $100K (مرفوع من $50K)
+
 // مفاتيح localStorage
 const AUTO_SEARCH_KEY = 'auto_search_settings';
 const FAVORITES_KEY = 'binance_watch_favorites';
@@ -251,28 +270,70 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
     const tickers = await response.json();
     
     console.log(`📊 عدد العملات المتاحة: ${tickers.length}`);
-    console.log(`🔍 البحث عن: USDT pairs, السعر: $${priceRange.min}-$${priceRange.max}, الحجم: >= $50K`);
+    console.log(`🔍 البحث عن: USDT pairs, السعر: $${priceRange.min}-$${priceRange.max}, الحجم: >= $${MIN_VOLUME/1000}K`);
     
     // 1. تصفية أزواج USDT فقط
     const usdtCoins = tickers.filter((t: any) => t.symbol.endsWith('USDT'));
     console.log(`📊 USDT Pairs: ${usdtCoins.length}`);
     
-    // 2. فلترة السعر
-    const priceFilteredCoins = usdtCoins.filter((t: any) => {
+    // 2. 🚫 استبعاد القائمة السوداء
+    const nonBlacklisted = usdtCoins.filter((t: any) => {
+      const symbol = t.symbol.replace('USDT', '');
+      const isBlacklisted = BLACKLIST.includes(symbol);
+      if (isBlacklisted) {
+        console.log(`🚫 مستبعد (قائمة سوداء): ${symbol}`);
+      }
+      return !isBlacklisted;
+    });
+    console.log(`🚫 بعد استبعاد القائمة السوداء: ${nonBlacklisted.length}`);
+    
+    // 3. فلترة السعر
+    const priceFilteredCoins = nonBlacklisted.filter((t: any) => {
       const price = parseFloat(t.lastPrice || 0);
       return price >= priceRange.min && price <= priceRange.max;
     });
     console.log(`📈 بعد فلتر السعر: ${priceFilteredCoins.length}`);
     
-    // 3. فلترة حجم التداول (>= $50,000) - نفس البحث اليدوي
+    // 4. فلترة حجم التداول (>= $100,000) - مرفوع من $50K
     const volumeFilteredCoins = priceFilteredCoins.filter((t: any) => {
       const volume = parseFloat(t.quoteVolume || 0);
-      return volume >= 50000;
+      return volume >= MIN_VOLUME;
     });
-    console.log(`💰 بعد فلتر الحجم (50K): ${volumeFilteredCoins.length}`);
+    console.log(`💰 بعد فلتر الحجم (${MIN_VOLUME/1000}K): ${volumeFilteredCoins.length}`);
     
-    // 4. تحويل لصيغة SearchCoin مع حساب المعايير
-    let coins: SearchCoin[] = volumeFilteredCoins.map((ticker: any) => {
+    // 5. 📊 فلترة تغير السعر 24h (تجنب Pump و Dump)
+    const priceChangeFilteredCoins = volumeFilteredCoins.filter((t: any) => {
+      const priceChangePercent = parseFloat(t.priceChangePercent || 0);
+      
+      // رفض Pump (ارتفاع مفرط > 15%)
+      if (priceChangePercent > PRICE_CHANGE_LIMITS.PUMP) {
+        console.log(`🚀 مستبعد (Pump +${priceChangePercent.toFixed(1)}%): ${t.symbol.replace('USDT', '')}`);
+        return false;
+      }
+      
+      // رفض Dump (انهيار < -15%)
+      if (priceChangePercent < PRICE_CHANGE_LIMITS.DUMP) {
+        console.log(`📉 مستبعد (Dump ${priceChangePercent.toFixed(1)}%): ${t.symbol.replace('USDT', '')}`);
+        return false;
+      }
+      
+      // قبول فقط العملات المستقرة أو الهابطة قليلاً (-10% إلى +3%)
+      if (priceChangePercent >= PRICE_CHANGE_LIMITS.MIN && priceChangePercent <= PRICE_CHANGE_LIMITS.MAX) {
+        return true;
+      }
+      
+      // العملات المرتفعة قليلاً (+3% إلى +15%) - نقبلها بحذر
+      if (priceChangePercent > PRICE_CHANGE_LIMITS.MAX && priceChangePercent <= PRICE_CHANGE_LIMITS.PUMP) {
+        // نقبلها لكن بأولوية أقل (سيتم ترتيبها لاحقاً)
+        return true;
+      }
+      
+      return false;
+    });
+    console.log(`📊 بعد فلتر تغير السعر (-10% إلى +15%): ${priceChangeFilteredCoins.length}`);
+    
+    // 6. تحويل لصيغة SearchCoin مع حساب المعايير
+    let coins: SearchCoin[] = priceChangeFilteredCoins.map((ticker: any) => {
       const price = parseFloat(ticker.lastPrice);
       const quoteVolume = parseFloat(ticker.quoteVolume || 0);
       const symbol = ticker.symbol.replace('USDT', '');
@@ -299,24 +360,33 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
     
     console.log(`✅ تم جلب ${coins.length} عملة من Binance بعد الفلاتر الأساسية`);
     
-    // 5. فلترة بناءً على Market Cap (>= $100K)
-    coins = coins.filter(coin => coin.volume24h >= 100000);
-    console.log(`بعد فلتر Market Cap: ${coins.length}`);
-    
-    // 6. فلترة السيولة (عالية أو متوسطة فقط)
+    // 7. فلترة السيولة (عالية أو متوسطة فقط)
     coins = coins.filter(coin => 
       coin.liquidity === "عالية" || coin.liquidity === "متوسطة"
     );
     console.log(`بعد فلتر السيولة: ${coins.length}`);
     
-    // 7. فلترة مستوى المخاطرة (منخفض أو متوسط فقط)
+    // 8. فلترة مستوى المخاطرة (منخفض أو متوسط فقط)
     coins = coins.filter(coin => 
       coin.riskLevel === "منخفض" || coin.riskLevel === "متوسط"
     );
     console.log(`بعد فلتر مستوى المخاطرة: ${coins.length}`);
     
-    // 8. ترتيب حسب درجة الأداء
-    coins.sort((a, b) => (b.performanceScore || 0) - (a.performanceScore || 0));
+    // 9. ترتيب ذكي: الأولوية للعملات المستقرة/الهابطة قليلاً ثم درجة الأداء
+    coins.sort((a, b) => {
+      const changeA = a.priceChange24h || 0;
+      const changeB = b.priceChange24h || 0;
+      
+      // العملات في نطاق -10% إلى +3% تحصل على أولوية أعلى
+      const isIdealA = changeA >= PRICE_CHANGE_LIMITS.MIN && changeA <= PRICE_CHANGE_LIMITS.MAX;
+      const isIdealB = changeB >= PRICE_CHANGE_LIMITS.MIN && changeB <= PRICE_CHANGE_LIMITS.MAX;
+      
+      if (isIdealA && !isIdealB) return -1;
+      if (!isIdealA && isIdealB) return 1;
+      
+      // إذا كلاهما في النطاق المثالي أو خارجه، رتب حسب درجة الأداء
+      return (b.performanceScore || 0) - (a.performanceScore || 0);
+    });
     
     // إضافة الترتيب
     coins = coins.map((coin, index) => ({
@@ -324,7 +394,7 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
       rank: index + 1
     }));
     
-    console.log(`✅ النتيجة النهائية: ${coins.length} عملة`);
+    console.log(`✅ النتيجة النهائية: ${coins.length} عملة (الأولوية للعملات المستقرة)`);
     
     return coins;
   } catch (error: any) {
@@ -333,13 +403,27 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
   }
 }
 
-// اختيار عملات عشوائية
+// اختيار عملات عشوائية مع التنويع (تجنب المكررات في المفضلة)
 function selectRandomCoins(coins: SearchCoin[], count: number): SearchCoin[] {
-  if (coins.length <= count) return coins;
+  // جلب العملات الموجودة في المفضلة لتجنب التكرار
+  const saved = localStorage.getItem(FAVORITES_KEY);
+  const favorites: SearchCoin[] = saved ? JSON.parse(saved) : [];
+  const existingSymbols = new Set(favorites.map(f => f.symbol));
+  
+  // استبعاد العملات الموجودة بالفعل
+  const availableCoins = coins.filter(coin => !existingSymbols.has(coin.symbol));
+  console.log(`🔄 التنويع: ${coins.length} عملة متاحة، ${existingSymbols.size} موجودة في المفضلة، ${availableCoins.length} جديدة`);
+  
+  if (availableCoins.length === 0) {
+    console.log(`⚠️ كل العملات موجودة بالفعل في المفضلة!`);
+    return [];
+  }
+  
+  if (availableCoins.length <= count) return availableCoins;
   
   const selected: SearchCoin[] = [];
-  const topHalf = Math.ceil(coins.length / 2);
-  const topCoins = coins.slice(0, topHalf);
+  const topHalf = Math.ceil(availableCoins.length / 2);
+  const topCoins = availableCoins.slice(0, topHalf);
   
   for (let i = 0; i < count && topCoins.length > 0; i++) {
     const randomIndex = Math.floor(Math.random() * topCoins.length);
