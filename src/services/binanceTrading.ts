@@ -37,9 +37,6 @@ export interface TradeResult {
   status?: string;
   error?: string;
   errorCode?: number;
-  // حقول الرافعة المالية
-  isMargin?: boolean;
-  leverage?: number;
 }
 
 export interface AccountBalance {
@@ -442,16 +439,8 @@ async function createSignature(queryString: string, secretKey: string): Promise<
     .join('');
 }
 
-// استيراد إعدادات الرافعة المالية
-const getMarginSettings = () => {
-  const enabled = localStorage.getItem('margin_enabled') === 'true';
-  const leverage = parseInt(localStorage.getItem('margin_leverage') || '3');
-  return { enabled, leverage };
-};
-
 /**
  * تحويل USDT إلى عملة معينة باستخدام Market Order مباشرة
- * يدعم الرافعة المالية (Margin) إذا كانت مفعلة
  */
 export async function buyWithAmount(
   symbol: string, 
@@ -460,14 +449,6 @@ export async function buyWithAmount(
   const credentials = getCredentials();
   if (!credentials) {
     return { success: false, error: 'لم يتم إعداد مفاتيح API' };
-  }
-
-  // التحقق من إعدادات الرافعة المالية
-  const marginSettings = getMarginSettings();
-  
-  if (marginSettings.enabled) {
-    console.log(`⚡ الرافعة المالية مفعلة: ${marginSettings.leverage}x`);
-    return buyWithMarginInternal(symbol, usdtAmount, marginSettings.leverage, credentials);
   }
 
   try {
@@ -646,9 +627,6 @@ export interface TradeHistoryItem {
   avgPrice: string;
   status: string;
   timestamp: number;
-  // حقول الرافعة المالية
-  isMargin?: boolean;
-  leverage?: number;
 }
 
 export function getTradeHistory(): TradeHistoryItem[] {
@@ -756,191 +734,4 @@ export default {
   // History
   getTradeHistory,
   clearTradeHistory,
-  
-  // Margin Trading
-  getMarginSettings,
 };
-
-/**
- * ⚡ شراء بالرافعة المالية (Isolated Margin)
- * يستخدم Edge Function الموجودة binance-convert مع تعديلات
- */
-async function buyWithMarginInternal(
-  symbol: string,
-  usdtAmount: number,
-  leverage: number,
-  credentials: { apiKey: string; secretKey: string }
-): Promise<TradeResult> {
-  try {
-    const tradingSymbol = symbol.toUpperCase().endsWith('USDT')
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase().replace('USDT', '')}USDT`;
-    
-    const cleanSymbol = tradingSymbol.replace('USDT', '');
-    const effectiveAmount = usdtAmount * leverage;
-
-    console.log(`⚡ شراء برافعة ${leverage}x: ${tradingSymbol}`);
-    console.log(`💰 المبلغ الأصلي: $${usdtAmount} → القوة الشرائية: $${effectiveAmount}`);
-
-    // استخدام Edge Function الموحدة binance-convert مع دعم Margin
-    let response: Response;
-    let data: any;
-    
-    try {
-      response = await fetch(`${SUPABASE_URL}/functions/v1/binance-convert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey: credentials.apiKey,
-          secretKey: credentials.secretKey,
-          fromAsset: 'USDT',
-          toAsset: cleanSymbol,
-          fromAmount: usdtAmount,
-          useMargin: true,
-          leverage: leverage,
-        }),
-      });
-      
-      data = await response.json();
-    } catch (fetchError) {
-      // إذا فشل الاتصال بـ Edge Function
-      console.log('⚠️ Edge Function غير متاحة، استخدام Spot العادي...');
-      return buySpotFallback(symbol, usdtAmount, credentials);
-    }
-
-    if (!response.ok || !data.success) {
-      console.error('❌ فشل الشراء بالرافعة:', data);
-      
-      // في حالة عدم دعم Margin أو عدم وجود Edge Function، نستخدم Spot العادي
-      if (data.error?.includes('not supported') || 
-          data.error?.includes('not enabled') || 
-          data.error?.includes('not found') ||
-          data.error?.includes('Function not found') ||
-          response.status === 404 ||
-          data.code === -11001) {
-        console.log('⚠️ Margin غير متاح، استخدام Spot العادي...');
-        return buySpotFallback(symbol, usdtAmount, credentials);
-      }
-      
-      return { 
-        success: false, 
-        error: data.error || data.msg || 'فشل الشراء بالرافعة' 
-      };
-    }
-
-    console.log('✅ تم الشراء برافعة بنجاح:', data);
-
-    // التحقق هل تم الشراء بالـ Margin فعلاً أم Spot (fallback)
-    const wasMargin = data.isMargin === true;
-    const actualLeverage = wasMargin ? leverage : 1;
-    const actualEffectiveAmount = wasMargin ? effectiveAmount : usdtAmount;
-
-    // حفظ الصفقة في السجل
-    saveTradeToHistory({
-      orderId: data.orderId || String(Date.now()),
-      symbol: tradingSymbol,
-      side: 'BUY',
-      executedQty: data.executedQty || String(data.toAmount) || '0',
-      cummulativeQuoteQty: String(actualEffectiveAmount),
-      avgPrice: data.inversePrice || data.avgPrice || data.price || '0',
-      status: 'FILLED',
-      timestamp: Date.now(),
-      isMargin: wasMargin,
-      leverage: actualLeverage,
-    });
-
-    // حفظ بيانات الاستثمار
-    const targetProfit = getCoinTargetProfit(cleanSymbol);
-    backupCoinInvestment(cleanSymbol, usdtAmount, targetProfit);
-    
-    if (wasMargin) {
-      localStorage.setItem(`margin_position_${cleanSymbol}`, JSON.stringify({
-        leverage: actualLeverage,
-        originalAmount: usdtAmount,
-        effectiveAmount: actualEffectiveAmount,
-        entryPrice: data.inversePrice || data.avgPrice || data.price,
-        timestamp: Date.now(),
-      }));
-      console.log(`💾 تم حفظ صفقة Margin: ${cleanSymbol} - رافعة ${actualLeverage}x`);
-    } else {
-      console.log(`💾 تم حفظ صفقة Spot: ${cleanSymbol} (Margin fallback)`);
-    }
-
-    return {
-      success: true,
-      orderId: data.orderId,
-      symbol: tradingSymbol,
-      side: 'BUY',
-      executedQty: data.executedQty || String(data.toAmount),
-      cummulativeQuoteQty: String(actualEffectiveAmount),
-      avgPrice: data.inversePrice || data.avgPrice || data.price,
-      status: 'FILLED',
-      isMargin: wasMargin,
-      leverage: actualLeverage,
-    };
-
-  } catch (error: any) {
-    console.error('❌ خطأ في الشراء بالرافعة:', error);
-    // Fallback إلى Spot العادي
-    console.log('⚠️ خطأ في Margin، استخدام Spot...');
-    return buySpotFallback(symbol, usdtAmount, credentials);
-  }
-}
-
-/**
- * شراء Spot عادي (fallback)
- */
-async function buySpotFallback(
-  symbol: string,
-  usdtAmount: number,
-  credentials: { apiKey: string; secretKey: string }
-): Promise<TradeResult> {
-  const tradingSymbol = symbol.toUpperCase().endsWith('USDT')
-    ? symbol.toUpperCase()
-    : `${symbol.toUpperCase().replace('USDT', '')}USDT`;
-  
-  const cleanSymbol = tradingSymbol.replace('USDT', '');
-
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/binance-convert`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      apiKey: credentials.apiKey,
-      secretKey: credentials.secretKey,
-      fromAsset: 'USDT',
-      toAsset: cleanSymbol,
-      fromAmount: usdtAmount,
-    }),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    return { success: false, error: data.error || 'فشل الشراء' };
-  }
-
-  saveTradeToHistory({
-    orderId: data.orderId || String(Date.now()),
-    symbol: tradingSymbol,
-    side: 'BUY',
-    executedQty: data.toAmount || '0',
-    cummulativeQuoteQty: String(usdtAmount),
-    avgPrice: data.inversePrice || '0',
-    status: 'FILLED',
-    timestamp: Date.now(),
-  });
-
-  const targetProfit = getCoinTargetProfit(cleanSymbol);
-  backupCoinInvestment(cleanSymbol, usdtAmount, targetProfit);
-
-  return {
-    success: true,
-    orderId: data.orderId,
-    symbol: tradingSymbol,
-    side: 'BUY',
-    executedQty: data.toAmount,
-    cummulativeQuoteQty: String(usdtAmount),
-    avgPrice: data.inversePrice,
-    status: 'FILLED',
-  };
-}

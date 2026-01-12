@@ -614,7 +614,18 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
               // 🎯 تنفيذ الشراء الفعلي
               if (smartSettings.enabled && hasCredentials()) {
                 const buyAmount = smartSettings.buyAmount;
-                addLog('info', `💰 جاري شراء $${buyAmount} من ${coin.symbol}...`, coin.symbol);
+                
+                // ⚡ جلب الرصيد الحقيقي قبل الشراء مباشرة
+                try {
+                  const currentBalance = await getUSDTBalance();
+                  if (currentBalance < buyAmount) {
+                    addLog('warning', `⛔ الرصيد غير كافي للشراء! متوفر: $${currentBalance.toFixed(2)} - مطلوب: $${buyAmount}`, coin.symbol);
+                    continue;
+                  }
+                  addLog('info', `💰 رصيد USDT الحالي: $${currentBalance.toFixed(2)} - جاري شراء $${buyAmount} من ${coin.symbol}...`, coin.symbol);
+                } catch (balanceError) {
+                  addLog('warning', `⚠️ فشل التحقق من الرصيد - متابعة الشراء...`, coin.symbol);
+                }
                 
                 try {
                   const buyResult = await buyWithAmount(coin.symbol, buyAmount);
