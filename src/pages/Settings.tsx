@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowRight, Save, LogOut, Key, BookOpen } from "lucide-react";
+import { Loader2, ArrowRight, Save, LogOut, Key, BookOpen, TrendingUp, AlertTriangle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import type { User } from "@supabase/supabase-js";
 
@@ -18,6 +18,9 @@ const Settings = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [isTestingAPI, setIsTestingAPI] = useState(false);
+  // إعدادات الرافعة المالية
+  const [marginEnabled, setMarginEnabled] = useState(false);
+  const [marginLeverage, setMarginLeverage] = useState(3);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -40,6 +43,16 @@ const Settings = () => {
       const savedGroqKey = localStorage.getItem('groq_api_key');
       if (savedGroqKey) {
         setGroqApiKey(savedGroqKey);
+      }
+
+      // قراءة إعدادات الرافعة المالية
+      const savedMarginEnabled = localStorage.getItem('margin_enabled');
+      const savedMarginLeverage = localStorage.getItem('margin_leverage');
+      if (savedMarginEnabled) {
+        setMarginEnabled(savedMarginEnabled === 'true');
+      }
+      if (savedMarginLeverage) {
+        setMarginLeverage(parseInt(savedMarginLeverage) || 3);
       }
 
       setIsFetching(false);
@@ -67,6 +80,10 @@ const Settings = () => {
       } else {
         localStorage.removeItem('groq_api_key');
       }
+
+      // حفظ إعدادات الرافعة المالية
+      localStorage.setItem('margin_enabled', marginEnabled.toString());
+      localStorage.setItem('margin_leverage', marginLeverage.toString());
 
       toast({
         title: "✅ تم الحفظ بنجاح",
@@ -334,6 +351,96 @@ const Settings = () => {
                 <p className="text-xs text-muted-foreground text-right">
                   🚀 <strong>مميزات:</strong> تحليل مزدوج من نموذجين مختلفين • سرعة فائقة • مجاني تماماً
                 </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ⚡ Margin Trading - الرافعة المالية */}
+        <Card className={`border-2 backdrop-blur-sm animate-fade-in ${marginEnabled ? 'border-orange-500/50 bg-gradient-to-br from-orange-500/10 to-red-500/10' : 'border-gray-500/20 bg-card/50'}`} style={{ animationDelay: '0.38s' }}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {marginEnabled && (
+                  <span className="px-2 py-1 bg-orange-500 text-white text-xs rounded-full font-bold animate-pulse">
+                    مُفعّل
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-right">الرافعة المالية (Margin)</CardTitle>
+                <TrendingUp className="w-5 h-5 text-orange-500" />
+              </div>
+            </div>
+            <CardDescription className="text-right">
+              استخدام الرافعة المالية في الشراء التلقائي - تضاعف الربح والخسارة
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* زر التفعيل */}
+            <div className="flex items-center justify-between p-4 bg-background/50 rounded-lg border">
+              <Button
+                type="button"
+                variant={marginEnabled ? "destructive" : "default"}
+                onClick={() => setMarginEnabled(!marginEnabled)}
+                className="gap-2"
+              >
+                {marginEnabled ? (
+                  <>❌ إيقاف الرافعة</>
+                ) : (
+                  <>✅ تفعيل الرافعة</>
+                )}
+              </Button>
+              <label className="text-sm font-medium text-right">
+                تفعيل الرافعة في الشراء التلقائي
+              </label>
+            </div>
+
+            {/* اختيار نسبة الرافعة */}
+            {marginEnabled && (
+              <div className="space-y-3 animate-fade-in">
+                <label className="text-sm font-medium text-right block">
+                  📊 نسبة الرافعة المالية:
+                </label>
+                <div className="flex gap-2 justify-end flex-wrap">
+                  {[2, 3, 5, 10].map((lev) => (
+                    <Button
+                      key={lev}
+                      type="button"
+                      variant={marginLeverage === lev ? "default" : "outline"}
+                      onClick={() => setMarginLeverage(lev)}
+                      className={`min-w-[60px] ${marginLeverage === lev ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+                    >
+                      {lev}x
+                    </Button>
+                  ))}
+                </div>
+                
+                {/* شرح الرافعة المختارة */}
+                <div className="bg-orange-500/10 rounded-lg p-4 border border-orange-500/30">
+                  <p className="text-sm text-right text-orange-600 dark:text-orange-400">
+                    <strong>مثال:</strong> بـ ${5} ورافعة {marginLeverage}x = قوة شرائية ${5 * marginLeverage}
+                  </p>
+                  <p className="text-xs text-right text-muted-foreground mt-1">
+                    الربح والخسارة مضروبة × {marginLeverage}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* تحذير */}
+            <div className="bg-red-500/10 rounded-lg p-4 border border-red-500/30 flex items-start gap-3">
+              <div className="flex-1 text-right">
+                <p className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center justify-end gap-2">
+                  <span>⚠️ تحذير هام</span>
+                  <AlertTriangle className="w-4 h-4" />
+                </p>
+                <ul className="text-xs text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+                  <li>الرافعة المالية تضاعف الخسارة كما تضاعف الربح</li>
+                  <li>قد تخسر كامل المبلغ المستثمر إذا نزل السعر</li>
+                  <li>يتم استخدام Isolated Margin لتحديد الخسارة</li>
+                  <li>تأكد من فهمك الكامل للمخاطر قبل التفعيل</li>
+                </ul>
               </div>
             </div>
           </CardContent>

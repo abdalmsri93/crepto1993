@@ -15,7 +15,7 @@ import {
   BarChart3
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { getTradeHistory, getTradeStats, clearTradeHistory, TradeRecord } from "@/services/tradeHistory";
+import { getTradeHistory, getTradeStats, clearTradeHistory, clearAllTradingData, TradeRecord } from "@/services/tradeHistory";
 import { useToast } from "@/hooks/use-toast";
 
 const TradeHistory = () => {
@@ -42,6 +42,19 @@ const TradeHistory = () => {
         title: "🗑️ تم المسح",
         description: "تم حذف جميع سجلات العمليات",
       });
+    }
+  };
+
+  const handleFullReset = () => {
+    if (confirm('⚠️ تحذير: سيتم مسح جميع بيانات التداول!\n\nهذا يشمل:\n- سجل العمليات\n- بيانات الاستثمار\n- سجل العملات المباعة\n\nهل أنت متأكد؟')) {
+      clearAllTradingData();
+      loadHistory();
+      toast({
+        title: "🔄 تم إعادة الضبط",
+        description: "تم مسح جميع بيانات التداول - ابدأ من جديد!",
+      });
+      // إعادة تحميل الصفحة لتحديث كل شيء
+      setTimeout(() => window.location.reload(), 1000);
     }
   };
 
@@ -79,13 +92,25 @@ const TradeHistory = () => {
             سجل العمليات
           </h1>
           <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={loadHistory}>
+            <Button variant="outline" size="icon" onClick={loadHistory} title="تحديث">
               <RefreshCw className="w-4 h-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={handleClearHistory} className="text-red-500 hover:text-red-600">
+            <Button variant="outline" size="icon" onClick={handleClearHistory} className="text-red-500 hover:text-red-600" title="مسح السجل">
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>
+        </div>
+
+        {/* زر إعادة الضبط الكاملة */}
+        <div className="flex justify-center">
+          <Button 
+            variant="destructive" 
+            onClick={handleFullReset}
+            className="gap-2 bg-red-600 hover:bg-red-700"
+          >
+            <Trash2 className="w-4 h-4" />
+            🔄 إعادة ضبط كاملة (مسح كل البيانات)
+          </Button>
         </div>
 
         {/* الإحصائيات */}

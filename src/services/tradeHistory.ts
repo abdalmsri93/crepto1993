@@ -103,6 +103,33 @@ export const clearTradeHistory = (): void => {
   console.log('🗑️ تم مسح سجل العمليات');
 };
 
+// مسح كل بيانات التداول (إعادة ضبط كاملة)
+export const clearAllTradingData = (): void => {
+  // مسح سجل العمليات
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem('binance_trade_history');
+  
+  // مسح بيانات الاستثمار
+  const keys = Object.keys(localStorage);
+  keys.forEach(key => {
+    if (key.startsWith('investment_') || 
+        key.startsWith('profit_percent_') ||
+        key.startsWith('buy_price_')) {
+      localStorage.removeItem(key);
+    }
+  });
+  
+  // مسح سجل العملات المباعة
+  localStorage.removeItem('sold_coins_registry');
+  localStorage.removeItem('investment_backup_data');
+  
+  // مسح بيانات المحفظة المحفوظة
+  localStorage.removeItem('binance_portfolio_data');
+  localStorage.removeItem('binance_portfolio_assets');
+  
+  console.log('🗑️ تم مسح جميع بيانات التداول');
+};
+
 // إحصائيات السجل
 export const getTradeStats = () => {
   const history = getTradeHistory();

@@ -37,6 +37,9 @@ export interface TradeResult {
   status?: string;
   error?: string;
   errorCode?: number;
+  // حقول الرافعة المالية
+  isMargin?: boolean;
+  leverage?: number;
 }
 
 export interface AccountBalance {
@@ -396,8 +399,16 @@ async function createSignature(queryString: string, secretKey: string): Promise<
     .join('');
 }
 
+// استيراد إعدادات الرافعة المالية
+const getMarginSettings = () => {
+  const enabled = localStorage.getItem('margin_enabled') === 'true';
+  const leverage = parseInt(localStorage.getItem('margin_leverage') || '3');
+  return { enabled, leverage };
+};
+
 /**
  * تحويل USDT إلى عملة معينة باستخدام Market Order مباشرة
+ * يدعم الرافعة المالية (Margin) إذا كانت مفعلة
  */
 export async function buyWithAmount(
   symbol: string, 
@@ -406,6 +417,14 @@ export async function buyWithAmount(
   const credentials = getCredentials();
   if (!credentials) {
     return { success: false, error: 'لم يتم إعداد مفاتيح API' };
+  }
+
+  // التحقق من إعدادات الرافعة المالية
+  const marginSettings = getMarginSettings();
+  
+  if (marginSettings.enabled) {
+    console.log(`⚡ الرافعة المالية مفعلة: ${marginSettings.leverage}x`);
+    return buyWithMarginInternal(symbol, usdtAmount, marginSettings.leverage, credentials);
   }
 
   try {
@@ -581,6 +600,9 @@ export interface TradeHistoryItem {
   avgPrice: string;
   status: string;
   timestamp: number;
+  // حقول الرافعة المالية
+  isMargin?: boolean;
+  leverage?: number;
 }
 
 export function getTradeHistory(): TradeHistoryItem[] {
@@ -688,4 +710,158 @@ export default {
   // History
   getTradeHistory,
   clearTradeHistory,
+  
+  // Margin Trading
+  getMarginSettings,
 };
+
+/**
+ * ⚡ شراء بالرافعة المالية (Isolated Margin)
+ */
+async function buyWithMarginInternal(
+  symbol: string,
+  usdtAmount: number,
+  leverage: number,
+  credentials: { apiKey: string; secretKey: string }
+): Promise<TradeResult> {
+  try {
+    const tradingSymbol = symbol.toUpperCase().endsWith('USDT')
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase().replace('USDT', '')}USDT`;
+    
+    const cleanSymbol = tradingSymbol.replace('USDT', '');
+    const effectiveAmount = usdtAmount * leverage;
+
+    console.log(`⚡ شراء برافعة ${leverage}x: ${tradingSymbol}`);
+    console.log(`💰 المبلغ الأصلي: $${usdtAmount} → القوة الشرائية: $${effectiveAmount}`);
+
+    // 1️⃣ تحويل USDT من Spot إلى Isolated Margin
+    console.log('📤 تحويل USDT إلى Isolated Margin...');
+    const transferResponse = await fetch(`${SUPABASE_URL}/functions/v1/margin-transfer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: credentials.apiKey,
+        secretKey: credentials.secretKey,
+        asset: 'USDT',
+        symbol: tradingSymbol,
+        amount: usdtAmount,
+        type: 'MAIN_TO_MARGIN',
+      }),
+    });
+
+    if (!transferResponse.ok) {
+      const error = await transferResponse.json();
+      console.error('❌ فشل التحويل:', error);
+      return { success: false, error: `فشل التحويل: ${error.error || error.msg}` };
+    }
+    console.log('✅ تم التحويل إلى Margin');
+
+    // 2️⃣ اقتراض المبلغ الإضافي (الرافعة)
+    const borrowAmount = usdtAmount * (leverage - 1);
+    if (borrowAmount > 0) {
+      console.log(`💰 اقتراض $${borrowAmount} (رافعة ${leverage - 1}x إضافية)...`);
+      const borrowResponse = await fetch(`${SUPABASE_URL}/functions/v1/margin-borrow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: credentials.apiKey,
+          secretKey: credentials.secretKey,
+          asset: 'USDT',
+          symbol: tradingSymbol,
+          amount: borrowAmount,
+          isIsolated: true,
+        }),
+      });
+
+      if (!borrowResponse.ok) {
+        const error = await borrowResponse.json();
+        console.error('❌ فشل الاقتراض:', error);
+        // إرجاع الأموال
+        await fetch(`${SUPABASE_URL}/functions/v1/margin-transfer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: credentials.apiKey,
+            secretKey: credentials.secretKey,
+            asset: 'USDT',
+            symbol: tradingSymbol,
+            amount: usdtAmount,
+            type: 'MARGIN_TO_MAIN',
+          }),
+        });
+        return { success: false, error: `فشل الاقتراض: ${error.error || error.msg}` };
+      }
+      console.log('✅ تم الاقتراض بنجاح');
+    }
+
+    // 3️⃣ تنفيذ أمر الشراء
+    console.log(`📊 تنفيذ أمر شراء بقيمة $${effectiveAmount}...`);
+    const orderResponse = await fetch(`${SUPABASE_URL}/functions/v1/margin-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: credentials.apiKey,
+        secretKey: credentials.secretKey,
+        symbol: tradingSymbol,
+        side: 'BUY',
+        type: 'MARKET',
+        quoteOrderQty: effectiveAmount,
+        isIsolated: true,
+      }),
+    });
+
+    if (!orderResponse.ok) {
+      const error = await orderResponse.json();
+      console.error('❌ فشل الشراء:', error);
+      return { success: false, error: `فشل الشراء: ${error.error || error.msg}` };
+    }
+
+    const orderData = await orderResponse.json();
+    console.log('✅ تم الشراء برافعة بنجاح:', orderData);
+
+    // حفظ الصفقة في السجل
+    saveTradeToHistory({
+      orderId: orderData.orderId || String(Date.now()),
+      symbol: tradingSymbol,
+      side: 'BUY',
+      executedQty: orderData.executedQty || '0',
+      cummulativeQuoteQty: String(effectiveAmount),
+      avgPrice: orderData.price || '0',
+      status: 'FILLED',
+      timestamp: Date.now(),
+      isMargin: true,
+      leverage,
+    });
+
+    // حفظ بيانات الاستثمار
+    const targetProfit = getCoinTargetProfit(cleanSymbol);
+    backupCoinInvestment(cleanSymbol, usdtAmount, targetProfit); // نحفظ المبلغ الأصلي
+    localStorage.setItem(`margin_position_${cleanSymbol}`, JSON.stringify({
+      leverage,
+      originalAmount: usdtAmount,
+      effectiveAmount,
+      entryPrice: orderData.price,
+      timestamp: Date.now(),
+    }));
+
+    console.log(`💾 تم حفظ صفقة Margin: ${cleanSymbol} - رافعة ${leverage}x`);
+
+    return {
+      success: true,
+      orderId: orderData.orderId,
+      symbol: tradingSymbol,
+      side: 'BUY',
+      executedQty: orderData.executedQty,
+      cummulativeQuoteQty: String(effectiveAmount),
+      avgPrice: orderData.price,
+      status: 'FILLED',
+      isMargin: true,
+      leverage,
+    };
+
+  } catch (error: any) {
+    console.error('❌ خطأ في الشراء بالرافعة:', error);
+    return { success: false, error: error.message || 'خطأ غير متوقع' };
+  }
+}
