@@ -492,7 +492,7 @@ const fetchFromCryptoCompare = async (symbol: string): Promise<{ launchDate: str
   try {
     console.log(`🔍 CryptoCompare: Searching for ${symbol}...`);
     const response = await fetch(
-      `https://min-api.cryptocompare.com/data/v2/histoday?fsym=${symbol}&tsym=USD&limit=1&allData=true`
+      `/api/cryptocompare/data/v2/histoday?fsym=${symbol}&tsym=USD&limit=1&allData=true`
     );
     
     if (response.ok) {

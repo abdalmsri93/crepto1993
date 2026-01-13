@@ -672,8 +672,7 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
                   
                   if (currentBalance < buyAmount) {
                     addLog('error', `⛔ الرصيد غير كافي! متوفر: $${currentBalance.toFixed(2)} - مطلوب: $${buyAmount}`, coin.symbol);
-                    // إزالة من المفضلات لأن الرصيد غير كافٍ
-                    removeFromFavorites(coin.symbol);
+                    addLog('info', `💡 سيتم المحاولة مرة أخرى في الدورة القادمة`, coin.symbol);
                     addedInCycle--;
                     continue;
                   }
@@ -683,8 +682,7 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
                 } catch (balanceError: any) {
                   addLog('error', `❌ فشل جلب الرصيد: ${balanceError.message}`, coin.symbol);
                   console.error('Balance Error Details:', balanceError);
-                  // إزالة من المفضلات لأننا لا نستطيع التحقق من الرصيد
-                  removeFromFavorites(coin.symbol);
+                  addLog('info', `💡 سيتم المحاولة مرة أخرى في الدورة القادمة`, coin.symbol);
                   addedInCycle--;
                   continue;
                 }
@@ -717,18 +715,19 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
                     localStorage.setItem(`investment_${coin.symbol}`, String(buyAmount));
                   } else {
                     addLog('error', `❌ فشل الشراء: ${buyResult.error}`, coin.symbol);
+                    addLog('info', `💡 العملة ستبقى في المفضلات - سيتم المحاولة مرة أخرى`, coin.symbol);
                     console.error('Buy Error Details:', buyResult);
                   }
                 } catch (buyError: any) {
                   addLog('error', `❌ خطأ في الشراء: ${buyError.message}`, coin.symbol);
+                  addLog('info', `💡 العملة ستبقى في المفضلات - سيتم المحاولة مرة أخرى`, coin.symbol);
                   console.error('Buy Exception:', buyError);
                 }
                 
-                // إذا فشل الشراء، أزل من المفضلات
+                // ✅ العملة تبقى في المفضلات حتى لو فشل الشراء
                 if (!buySuccess) {
-                  removeFromFavorites(coin.symbol);
                   addedInCycle--;
-                  addLog('warning', `🗑️ تمت إزالة ${coin.symbol} من المفضلات (فشل الشراء)`, coin.symbol);
+                  addLog('info', `📌 ${coin.symbol} ستبقى في المفضلات للمحاولة لاحقاً`, coin.symbol);
                 }
               } else {
                 // شرح سبب عدم الشراء

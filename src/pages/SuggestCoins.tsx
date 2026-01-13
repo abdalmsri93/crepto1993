@@ -202,9 +202,26 @@ const SuggestCoins = () => {
     
     const fetchCurrentAssets = async () => {
       try {
+        // جلب Binance API Keys
+        const savedKeys = localStorage.getItem('binanceCredentials');
+        if (!savedKeys) {
+          console.log('⚠️ No Binance credentials found');
+          return;
+        }
+
+        const credentials = JSON.parse(savedKeys);
+        if (!credentials.apiKey || !credentials.secretKey) {
+          console.log('⚠️ Invalid Binance credentials');
+          return;
+        }
+
         const { data, error } = await supabase.functions.invoke('binance-portfolio', {
           headers: {
             Authorization: `Bearer ${session.access_token}`
+          },
+          body: {
+            apiKey: credentials.apiKey,
+            secretKey: credentials.secretKey
           }
         });
         

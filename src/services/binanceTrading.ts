@@ -480,31 +480,50 @@ export async function buyWithAmount(
       };
     }
 
-    console.log('📤 إرسال أمر الشراء إلى Binance...');
+    console.log('📤 إرسال أمر الشراء مباشرة عبر Vite Proxy...');
+    console.log('💱 Symbol:', tradingSymbol);
+    console.log('💵 Amount: $', usdtAmount);
 
-    // إرسال الطلب مباشرة للـ Edge Function
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/binance-convert`, {
+    // 🚀 استخدام Vite proxy للوصول إلى Binance API
+    const timestamp = Date.now();
+    const params = new URLSearchParams({
+      symbol: tradingSymbol,
+      side: 'BUY',
+      type: 'MARKET',
+      quoteOrderQty: usdtAmount.toFixed(2),
+      timestamp: timestamp.toString(),
+    });
+
+    // إنشاء التوقيع
+    const signature = await createSignature(params.toString(), credentials.secretKey);
+    params.append('signature', signature);
+
+    const response = await fetch(`/api/binance/api/v3/order?${params.toString()}`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      headers: {
+        'X-MBX-APIKEY': credentials.apiKey,
       },
-      body: JSON.stringify({
-        apiKey: credentials.apiKey,
-        secretKey: credentials.secretKey,
-        fromAsset: 'USDT',
-        toAsset: tradingSymbol.replace('USDT', ''),
-        fromAmount: usdtAmount,
-      }),
     });
 
     const data = await response.json();
+    console.log('📥 Binance Response:', data);
 
-    if (!response.ok || !data.success) {
+    if (!response.ok || data.code) {
       console.error('❌ خطأ من Binance:', data);
+      
+      // توضيح الخطأ بشكل أفضل
+      let errorMessage = data?.msg || 'فشل تنفيذ الشراء';
+      if (data?.code === -2010) {
+        errorMessage = 'رصيد غير كافٍ في حساب Binance';
+      } else if (data?.code === -1021) {
+        errorMessage = 'خطأ في التوقيت - تحقق من ساعة النظام';
+      } else if (data?.code === -1022) {
+        errorMessage = 'توقيع غير صحيح - تحقق من Secret Key';
+      }
+      
       return {
         success: false,
-        error: data?.error || data?.msg || 'فشل تنفيذ الشراء',
+        error: errorMessage,
         errorCode: data?.code,
       };
     }
@@ -514,15 +533,20 @@ export async function buyWithAmount(
     // تحضير اسم الرمز للحفظ
     const cleanSymbol = tradingSymbol.replace('USDT', '');
 
+    // حساب السعر المتوسط
+    const avgPrice = data.fills && data.fills.length > 0 
+      ? data.fills[0].price 
+      : (parseFloat(data.cummulativeQuoteQty) / parseFloat(data.executedQty)).toFixed(8);
+
     // حفظ الصفقة في السجل
     saveTradeToHistory({
       orderId: data.orderId || String(Date.now()),
       symbol: tradingSymbol,
       side: 'BUY',
-      executedQty: data.toAmount || '0',
-      cummulativeQuoteQty: String(usdtAmount),
-      avgPrice: data.inversePrice || '0',
-      status: 'FILLED',
+      executedQty: data.executedQty || '0',
+      cummulativeQuoteQty: data.cummulativeQuoteQty || String(usdtAmount),
+      avgPrice: avgPrice,
+      status: data.status || 'FILLED',
       timestamp: Date.now(),
     });
 
@@ -537,12 +561,12 @@ export async function buyWithAmount(
     return {
       success: true,
       orderId: data.orderId,
-      symbol: tradingSymbol,
-      side: 'BUY',
-      executedQty: data.toAmount,
-      cummulativeQuoteQty: String(usdtAmount),
-      avgPrice: data.inversePrice,
-      status: 'FILLED',
+      symbol: data.symbol || tradingSymbol,
+      side: data.side || 'BUY',
+      executedQty: data.executedQty || '0',
+      cummulativeQuoteQty: data.cummulativeQuoteQty || String(usdtAmount),
+      avgPrice: avgPrice,
+      status: data.status || 'FILLED',
     };
   } catch (error: any) {
     console.error('❌ خطأ في التحويل:', error);
