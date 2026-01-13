@@ -18,8 +18,10 @@ import {
   getSmartTradingSummary,
   resetSmartTradingState,
   syncPortfolioWithSmartTrading,
-  getPendingCoins
+  getPendingCoins,
+  getCoinTargetProfit
 } from "@/services/smartTradingService";
+import { getCoinInvestment } from "@/services/investmentBackupService";
 
 const Favorites = () => {
   const navigate = useNavigate();
@@ -184,33 +186,25 @@ const Favorites = () => {
         </Card>
 
         {/* 🛒 بطاقة الشراء التلقائي */}
-        <Card className={`border-2 transition-all ${autoBuySettings.enabled ? 'border-green-500/50 bg-green-500/5' : 'border-primary/20 bg-card/50'} backdrop-blur`}>
+        <Card className="border-2 border-green-500/50 bg-green-500/5 backdrop-blur">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
-                <ShoppingCart className={`w-5 h-5 ${autoBuySettings.enabled ? 'text-green-500' : 'text-muted-foreground'}`} />
+                <ShoppingCart className="w-5 h-5 text-green-500" />
                 الشراء التلقائي
-                {autoBuySettings.enabled && (
-                  <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
-                    مفعل
-                  </span>
-                )}
+                <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+                  مفعل
+                </span>
               </CardTitle>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAutoBuySettings(!showAutoBuySettings)}
-                  className="gap-1"
-                >
-                  <Settings className="w-4 h-4" />
-                  إعدادات
-                </Button>
-                <Switch
-                  checked={autoBuySettings.enabled}
-                  onCheckedChange={handleToggleAutoBuy}
-                />
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAutoBuySettings(!showAutoBuySettings)}
+                className="gap-1"
+              >
+                <Settings className="w-4 h-4" />
+                إعدادات
+              </Button>
             </div>
           </CardHeader>
           
@@ -218,17 +212,8 @@ const Favorites = () => {
             {/* الحالة */}
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                {autoBuySettings.enabled ? (
-                  <>
-                    <Zap className="w-4 h-4 text-green-500" />
-                    <span className="text-green-500">جاهز للشراء عند إضافة عملة جديدة</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                    <span className="text-muted-foreground">الشراء التلقائي معطل</span>
-                  </>
-                )}
+                <Zap className="w-4 h-4 text-green-500" />
+                <span className="text-green-500">جاهز للشراء عند إضافة عملة جديدة</span>
               </div>
               <div className="flex items-center gap-1 text-crypto-gold font-bold">
                 <DollarSign className="w-4 h-4" />
@@ -332,57 +317,22 @@ const Favorites = () => {
         </Card>
 
         {/* 📈 بطاقة البيع التلقائي عند الربح */}
-        <Card className={`border-2 transition-all ${autoSellSettings.enabled ? 'border-purple-500/50 bg-purple-500/5' : 'border-primary/20 bg-card/50'} backdrop-blur`}>
+        <Card className="border-2 border-purple-500/50 bg-purple-500/5 backdrop-blur">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <TrendingUp className={`w-5 h-5 ${autoSellSettings.enabled ? 'text-purple-500' : 'text-muted-foreground'}`} />
-                البيع التلقائي عند الربح
-                {autoSellSettings.enabled && (
-                  <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
-                    مفعل
-                  </span>
-                )}
-              </CardTitle>
-              <Switch
-                checked={autoSellSettings.enabled}
-                onCheckedChange={(enabled) => {
-                  if (enabled && !hasApiKeys) {
-                    toast({
-                      title: "⚠️ مطلوب إعداد API",
-                      description: "يجب إعداد مفاتيح Binance API أولاً",
-                      variant: "destructive",
-                    });
-                    navigate('/trading-settings');
-                    return;
-                  }
-                  saveAutoSellSettings({ enabled });
-                  setAutoSellSettings(prev => ({ ...prev, enabled }));
-                  toast({
-                    title: enabled ? "📈 تم التفعيل" : "⏸️ تم الإيقاف",
-                    description: enabled 
-                      ? `سيتم بيع العملات تلقائياً حسب النسب الذكية (3% → 15%)`
-                      : "تم إيقاف البيع التلقائي",
-                  });
-                }}
-              />
-            </div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="w-5 h-5 text-purple-500" />
+              البيع التلقائي عند الربح
+              <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+                مفعل
+              </span>
+            </CardTitle>
           </CardHeader>
           
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                {autoSellSettings.enabled ? (
-                  <>
-                    <TrendingUp className="w-4 h-4 text-purple-500" />
-                    <span className="text-purple-500">البيع يتم تلقائياً حسب النسب المتصاعدة</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                    <span className="text-muted-foreground">البيع التلقائي معطل</span>
-                  </>
-                )}
+                <TrendingUp className="w-4 h-4 text-purple-500" />
+                <span className="text-purple-500">البيع يتم تلقائياً حسب النسب المتصاعدة</span>
               </div>
               <div className="flex items-center gap-1 text-purple-400 font-bold">
                 <Target className="w-4 h-4" />
@@ -433,59 +383,31 @@ const Favorites = () => {
         </Card>
 
         {/* 🎯 بطاقة التداول الذكي */}
-        <Card className={`border-2 transition-all ${smartTradingSettings.enabled ? 'border-orange-500/50 bg-orange-500/5' : 'border-primary/20 bg-card/50'} backdrop-blur`}>
+        <Card className="border-2 border-orange-500/50 bg-orange-500/5 backdrop-blur">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Brain className={`w-5 h-5 ${smartTradingSettings.enabled ? 'text-orange-500' : 'text-muted-foreground'}`} />
+                <Brain className="w-5 h-5 text-orange-500" />
                 التداول الذكي
-                {smartTradingSettings.enabled && (
-                  <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
-                    مفعل
-                  </span>
-                )}
+                <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+                  مفعل
+                </span>
               </CardTitle>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowSmartSettings(!showSmartSettings)}
-                  className="gap-1"
-                >
-                  <Settings className="w-4 h-4" />
-                  إعدادات
-                </Button>
-                <Switch
-                  checked={smartTradingSettings.enabled}
-                  onCheckedChange={(enabled) => {
-                    if (enabled && !hasApiKeys) {
-                      toast({
-                        title: "⚠️ مطلوب إعداد API",
-                        description: "يجب إعداد مفاتيح Binance API أولاً",
-                        variant: "destructive",
-                      });
-                      navigate('/trading-settings');
-                      return;
-                    }
-                    saveSmartTradingSettings({ enabled });
-                    setSmartTradingSettings(prev => ({ ...prev, enabled }));
-                    setSmartTradingSummary(getSmartTradingSummary());
-                    toast({
-                      title: enabled ? "🎯 تم التفعيل" : "⏸️ تم الإيقاف",
-                      description: enabled 
-                        ? "نظام التداول الذكي يعمل الآن بنسب متصاعدة"
-                        : "تم إيقاف التداول الذكي",
-                    });
-                  }}
-                />
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSmartSettings(!showSmartSettings)}
+                className="gap-1"
+              >
+                <Settings className="w-4 h-4" />
+                إعدادات
+              </Button>
             </div>
           </CardHeader>
           
           <CardContent className="space-y-4">
             {/* ملخص الحالة الحالية */}
-            {smartTradingSettings.enabled && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="p-3 bg-orange-500/10 rounded-lg text-center">
                   <p className="text-xs text-muted-foreground">الدورة الحالية</p>
                   <p className="text-xl font-bold text-orange-500">#{smartTradingSummary.currentCycle}</p>
@@ -503,7 +425,6 @@ const Favorites = () => {
                   <p className="text-xl font-bold text-purple-500">{smartTradingSummary.pendingCoins}</p>
                 </div>
               </div>
-            )}
 
             {/* شرح النظام */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -668,13 +589,38 @@ const Favorites = () => {
                             {index + 1}
                           </div>
                         </div>
-                        <div>
-                          <div className="font-bold text-lg text-crypto-gold">
-                            {coin.symbol}
+                        <div className="flex-1 flex items-center justify-between">
+                          <div className="text-right">
+                            <div className="font-bold text-lg text-crypto-gold">
+                              {coin.symbol}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {coin.name}
+                            </div>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {coin.name}
-                          </div>
+                          
+                          {/* 🎯 نسبة البيع والهدف */}
+                          {(() => {
+                            // إزالة USDT من نهاية الرمز
+                            const cleanSymbol = coin.symbol.replace(/USDT$/i, '');
+                            const investmentData = getCoinInvestment(cleanSymbol);
+                            const investment = investmentData?.investment || 0;
+                            const targetPercent = getCoinTargetProfit(cleanSymbol);
+                            const targetValue = investment > 0 ? investment * (1 + targetPercent / 100) : 0;
+                            
+                            return investment > 0 ? (
+                              <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/30 px-3 py-2 min-w-[90px]">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <span className="text-[10px] text-green-400">🎯 نسبة البيع</span>
+                                  <span className="text-green-400 font-bold text-sm">{targetPercent}%</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] text-emerald-400">💰 الهدف</span>
+                                  <span className="text-emerald-400 font-bold text-sm">${targetValue.toFixed(2)}</span>
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
 

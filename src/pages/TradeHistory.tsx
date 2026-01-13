@@ -17,6 +17,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { getTradeHistory, getTradeStats, clearTradeHistory, clearAllTradingData, TradeRecord } from "@/services/tradeHistory";
 import { useToast } from "@/hooks/use-toast";
+import { getCoinInvestment } from "@/services/investmentBackupService";
+import { getCoinTargetProfit } from "@/services/smartTradingService";
 
 const TradeHistory = () => {
   const [history, setHistory] = useState<TradeRecord[]>([]);
@@ -227,7 +229,7 @@ const TradeHistory = () => {
                         </div>
                         
                         {/* تفاصيل العملية */}
-                        <div>
+                        <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-bold">{record.asset}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -250,6 +252,29 @@ const TradeHistory = () => {
                             <p className="text-xs text-red-500 mt-1">{record.error}</p>
                           )}
                         </div>
+                        
+                        {/* 🎯 نسبة البيع والهدف */}
+                        {(() => {
+                          // إزالة USDT من نهاية الرمز
+                          const cleanSymbol = record.asset.replace(/USDT$/i, '');
+                          const investmentData = getCoinInvestment(cleanSymbol);
+                          const investment = investmentData?.investment || 0;
+                          const targetPercent = getCoinTargetProfit(cleanSymbol);
+                          const targetValue = investment > 0 ? investment * (1 + targetPercent / 100) : 0;
+                          
+                          return investment > 0 ? (
+                            <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/30 px-3 py-2 min-w-[90px]">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className="text-[10px] text-green-400">🎯 نسبة البيع</span>
+                                <span className="text-green-400 font-bold text-sm">{targetPercent}%</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] text-emerald-400">💰 الهدف</span>
+                                <span className="text-emerald-400 font-bold text-sm">${targetValue.toFixed(2)}</span>
+                              </div>
+                            </div>
+                          ) : null;
+                        })()}
                       </div>
                       
                       {/* المبلغ والربح */}

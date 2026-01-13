@@ -125,9 +125,17 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     const autoSellSettings = getAutoSellSettings();
     const smartTradingSettings = getSmartTradingSettings();
     
-    if (!autoSellSettings.enabled || !hasCredentials()) return;
+    if (!autoSellSettings.enabled || !hasCredentials()) {
+      console.log(`⏭️ تخطي ${asset}: البيع التلقائي ${!autoSellSettings.enabled ? 'معطل' : 'لا توجد مفاتيح API'}`);
+      return;
+    }
     
     const currentValue = parseFloat(usdValue);
+    if (isNaN(currentValue) || currentValue <= 0) {
+      console.log(`⏭️ تخطي ${asset}: قيمة غير صحيحة $${usdValue}`);
+      return;
+    }
+    
     const profitPercent = ((currentValue - savedInvestment) / savedInvestment) * 100;
     
     // 🎯 استخدام نسبة التداول الذكي إذا كان مفعّلاً، وإلا استخدام النسبة الثابتة

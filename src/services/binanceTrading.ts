@@ -148,6 +148,14 @@ export interface AutoSellSettings {
 }
 
 export function getAutoSellSettings(): AutoSellSettings {
+  // ✅ تفعيل تلقائي عند أول استخدام
+  const storedEnabled = localStorage.getItem(STORAGE_KEYS.AUTO_SELL_ENABLED);
+  if (storedEnabled === null) {
+    // أول مرة - فعّل تلقائياً
+    localStorage.setItem(STORAGE_KEYS.AUTO_SELL_ENABLED, 'true');
+    console.log('🎯 تم تفعيل البيع التلقائي تلقائياً');
+  }
+  
   return {
     enabled: localStorage.getItem(STORAGE_KEYS.AUTO_SELL_ENABLED) === 'true',
     profitPercent: parseFloat(localStorage.getItem(STORAGE_KEYS.AUTO_SELL_PROFIT_PERCENT) || '10'),
