@@ -66,13 +66,13 @@ export const PortfolioHeader = ({
   return (
     <div className="glass-card rounded-2xl p-8 mb-8 relative overflow-hidden animate-fade-in border-2 border-primary/30">
       <div className="absolute inset-0 gradient-crypto opacity-20 animate-pulse"></div>
-      <div className="absolute top-0 right-0 w-96 h-96 bg-crypto-gold/10 rounded-full filter blur-3xl -mr-48 -mt-48"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full filter blur-3xl -mr-48 -mt-48"></div>
       <div className="relative z-10">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-crypto-gold to-crypto-green rounded-full filter blur-lg opacity-70"></div>
-              <h1 className="relative text-4xl font-orbitron font-bold bg-gradient-to-r from-crypto-gold to-crypto-green bg-clip-text text-transparent">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full filter blur-lg opacity-70"></div>
+              <h1 className="relative text-4xl font-orbitron font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
                 محفظة Binance
               </h1>
             </div>
@@ -115,10 +115,10 @@ export const PortfolioHeader = ({
           <div className="space-y-3">
             <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">الرصيد المقدّر</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-orbitron font-black text-transparent bg-gradient-to-r from-crypto-gold to-crypto-green bg-clip-text transition-all duration-300 hover:scale-110 inline-block">
+              <span className="text-5xl font-orbitron font-black text-transparent bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text transition-all duration-300 hover:scale-110 inline-block">
                 {parseFloat(totalValue).toLocaleString('en-US', { maximumFractionDigits: 8 })}
               </span>
-              <span className="text-base text-crypto-gold font-semibold">USDT</span>
+              <span className="text-base text-emerald-400 font-semibold">USDT</span>
             </div>
             <p className="text-sm text-muted-foreground/70">
               ≈ ${parseFloat(totalValue).toLocaleString('en-US', { maximumFractionDigits: 2 })}
