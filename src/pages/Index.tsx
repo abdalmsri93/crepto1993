@@ -194,12 +194,17 @@ const Index = () => {
         localStorage.setItem('binance_portfolio_assets', JSON.stringify(portfolioAssets));
         console.log('📦 حفظ عملات المحفظة:', portfolioAssets);
         
-        // 🎯 تعيين نسب البيع للعملات الموجودة تلقائياً
-        const coinsWithValue = data.balances
-          .filter((b: any) => b.asset !== 'USDT' && parseFloat(b.usdValue || '0') > 1)
-          .map((b: any) => b.asset);
-        if (coinsWithValue.length > 0) {
-          assignProfitPercentsToExistingCoins(coinsWithValue);
+        // 🎯 تعيين نسب البيع للعملات الموجودة - مرة واحدة فقط عند أول تشغيل
+        const hasInitialized = localStorage.getItem('smart_trading_initialized');
+        if (!hasInitialized) {
+          const coinsWithValue = data.balances
+            .filter((b: any) => b.asset !== 'USDT' && parseFloat(b.usdValue || '0') > 1)
+            .map((b: any) => b.asset);
+          if (coinsWithValue.length > 0) {
+            console.log('🔧 تهيئة أولية - تعيين النسب للعملات الموجودة');
+            assignProfitPercentsToExistingCoins(coinsWithValue);
+            localStorage.setItem('smart_trading_initialized', 'true');
+          }
         }
         
         // 📜 تسجيل العمليات السابقة في السجل (مرة واحدة)
