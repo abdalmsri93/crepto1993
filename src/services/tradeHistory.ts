@@ -8,7 +8,8 @@ export interface TradeRecord {
   price: number;         // السعر وقت العملية
   total: number;         // المجموع بـ USDT
   profit?: number;       // الربح/الخسارة (للبيع فقط)
-  profitPercent?: number; // نسبة الربح/الخسارة
+  profitPercent?: number; // نسبة الربح/الخسارة الفعلية (102.4%, 4.2%...)
+  targetPercent?: number; // نسبة الهدف المطلوبة للبيع (3%, 5%, 7%...)
   timestamp: string;     // التاريخ والوقت
   status: 'success' | 'failed';
   error?: string;        // رسالة الخطأ إذا فشلت
@@ -82,6 +83,7 @@ export const addSellRecord = (
   profit: number,
   profitPercent: number,
   success: boolean,
+  targetPercent?: number,  // ← النسبة المطلوبة (3%, 5%, 7%...)
   error?: string
 ): TradeRecord => {
   return addTradeRecord({
@@ -92,6 +94,7 @@ export const addSellRecord = (
     total,
     profit,
     profitPercent,
+    targetPercent,  // ← حفظ نسبة الهدف
     status: success ? 'success' : 'failed',
     error,
   });

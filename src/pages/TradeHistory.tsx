@@ -293,9 +293,16 @@ const TradeHistory = () => {
                           ${record.total.toFixed(2)}
                         </p>
                         {record.type === 'sell' && record.profit !== undefined && (
-                          <p className={`text-sm font-bold ${record.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {record.profit >= 0 ? '+' : ''}{record.profit.toFixed(2)}$ ({record.profitPercent?.toFixed(1)}%)
-                          </p>
+                          <>
+                            <p className={`text-sm font-bold ${record.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {record.profit >= 0 ? '+' : ''}{record.profit.toFixed(2)}$ ({record.profitPercent?.toFixed(1)}%)
+                            </p>
+                            {record.targetPercent && (
+                              <p className="text-xs text-emerald-400 mt-1">
+                                🎯 نسبة البيع: {record.targetPercent}%
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

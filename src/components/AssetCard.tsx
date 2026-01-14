@@ -109,120 +109,68 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     }
   }, [asset, isSoldOrDust]);
   
-  // ⏰ فحص دوري كل 30 ثانية لضمان عمل البيع التلقائي
+  // ❌ تم إلغاء نظام الفحص الدوري (30 ثانية) - استبدل بنظام Take Profit
+  // ✅ الآن بايننس نفسه يبيع تلقائياً عند الوصول للنسبة المحددة
+  
+  // 🔍 فحص حالة أمر Take Profit كل دقيقة (للتحديث فقط)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCheckCounter(prev => prev + 1);
-    }, 30000); // كل 30 ثانية
+    const interval = setInterval(async () => {
+      const { getTakeProfitOrder, checkOrderStatus, deleteTakeProfitOrder } = await import('@/services/takeProfitService');
+      const { registerSell } = await import('@/services/smartTradingService');
+      const { removeCoinInvestment } = await import('@/services/coinInvestmentService');
+      
+      const order = getTakeProfitOrder(asset);
+      if (!order) return;
+      
+      const { filled } = await checkOrderStatus(asset, order.orderId);
+      
+      if (filled) {
+        console.log(`✅ تم تنفيذ أمر Take Profit لـ ${asset}!`);
+        
+        // حساب الربح
+        const soldTotal = order.quantity * order.targetPrice;
+        const profit = soldTotal - savedInvestment;
+        const profitPercent = ((soldTotal - savedInvestment) / savedInvestment) * 100;
+        
+        toast({
+          title: `✅ تم بيع ${asset} تلقائياً!`,
+          description: `السعر: $${order.targetPrice.toFixed(8)} | الربح: $${profit.toFixed(2)} (${profitPercent.toFixed(1)}%)`,
+        });
+        
+        // تسجيل في سجل العمليات
+        addSellRecord(
+          asset,
+          order.quantity,
+          order.targetPrice,
+          soldTotal,
+          profit,
+          profitPercent,
+          true,
+          order.targetPercent
+        );
+        
+        // تسجيل البيع في نظام التداول الذكي
+        const smartTradingSettings = getSmartTradingSettings();
+        if (smartTradingSettings.enabled) {
+          const sellResult = registerSell(asset, profit);
+          toast({
+            title: `💰 البيع التلقائي نجح!`,
+            description: `النسبة الجديدة: ${sellResult.newProfitPercent}%`,
+          });
+        }
+        
+        // حذف أمر Take Profit
+        deleteTakeProfitOrder(asset);
+        
+        // مسح بيانات الاستثمار
+        removeCoinInvestment(asset, true, soldTotal, profit);
+        setSavedInvestment(0);
+        setSavedTargetProfit(0);
+      }
+    }, 60000); // كل دقيقة
     
     return () => clearInterval(interval);
-  }, []);
-  
-  // 🔄 البيع التلقائي عند وصول الربح للنسبة المطلوبة
-  useEffect(() => {
-    if (asset === 'USDT' || savedInvestment <= 0 || autoSellTriggeredRef.current || isSelling) return;
-    
-    const autoSellSettings = getAutoSellSettings();
-    const smartTradingSettings = getSmartTradingSettings();
-    
-    if (!autoSellSettings.enabled || !hasCredentials()) {
-      console.log(`⏭️ تخطي ${asset}: البيع التلقائي ${!autoSellSettings.enabled ? 'معطل' : 'لا توجد مفاتيح API'}`);
-      return;
-    }
-    
-    const currentValue = parseFloat(usdValue);
-    if (isNaN(currentValue) || currentValue <= 0) {
-      console.log(`⏭️ تخطي ${asset}: قيمة غير صحيحة $${usdValue}`);
-      return;
-    }
-    
-    const profitPercent = ((currentValue - savedInvestment) / savedInvestment) * 100;
-    
-    // 🎯 استخدام نسبة التداول الذكي إذا كان مفعّلاً، وإلا استخدام النسبة الثابتة
-    // getCoinTargetProfit تجلب النسبة المحفوظة وقت الشراء لهذه العملة
-    const targetProfitPercent = smartTradingSettings.enabled 
-      ? getCoinTargetProfit(asset) 
-      : autoSellSettings.profitPercent;
-    
-    // طباعة حالة الفحص للتتبع
-    console.log(`🔍 فحص ${asset}: القيمة $${currentValue.toFixed(2)} | الاستثمار $${savedInvestment} | الربح ${profitPercent.toFixed(2)}% | المطلوب ${targetProfitPercent}%${smartTradingSettings.enabled ? ' (ذكي)' : ''}`);
-    
-    // التحقق من وصول الربح للنسبة المطلوبة
-    if (profitPercent >= targetProfitPercent) {
-      console.log(`🎯 ${asset} وصل للربح ${profitPercent.toFixed(2)}% (المطلوب: ${targetProfitPercent}%)`);
-      
-      // منع التكرار
-      autoSellTriggeredRef.current = true;
-      setIsSelling(true);
-      
-      // تنفيذ البيع
-      sellAsset(asset).then(result => {
-        setIsSelling(false);
-        const soldAmount = parseFloat(result.executedQty || '0');
-        const soldTotal = parseFloat(result.cummulativeQuoteQty || '0');
-        const profit = soldTotal - savedInvestment;
-        
-        if (result.success) {
-          toast({
-            title: `✅ تم بيع ${asset} بنجاح!`,
-            description: `تم تحويل ${result.executedQty} إلى ${result.cummulativeQuoteQty} USDT (ربح: $${profit.toFixed(2)})`,
-          });
-          
-          // 📜 حفظ في سجل العمليات
-          addSellRecord(
-            asset,
-            soldAmount,
-            soldTotal / soldAmount, // السعر
-            soldTotal,
-            profit,
-            profitPercent,
-            true
-          );
-          
-          // 🎯 تسجيل البيع في نظام التداول الذكي
-          if (smartTradingSettings.enabled) {
-            const sellResult = registerSell(asset, profit);
-            
-            toast({
-              title: `💰 تم البيع بنجاح!`,
-              description: `النسبة الجديدة للشراء التالي: ${sellResult.newProfitPercent}%`,
-            });
-            
-            // 🔄 تفعيل البحث التلقائي لبدء دورة جديدة
-            // إرسال حدث مخصص لتفعيل البحث
-            window.dispatchEvent(new CustomEvent('smart-trading-cycle-complete', {
-              detail: { newProfitPercent: sellResult.newProfitPercent }
-            }));
-          }
-          
-          // 🗑️ مسح بيانات الاستثمار بعد البيع الناجح فقط (مع تسجيل كعملة مباعة)
-          removeCoinInvestment(asset, true, soldTotal, profit);
-          setSavedInvestment(0);
-          setSavedTargetProfit(0);
-        } else {
-          toast({
-            title: `❌ فشل بيع ${asset}`,
-            description: result.error,
-            variant: "destructive",
-          });
-          
-          // 📜 حفظ العملية الفاشلة في السجل
-          addSellRecord(
-            asset,
-            0,
-            0,
-            0,
-            0,
-            0,
-            false,
-            result.error
-          );
-          
-          autoSellTriggeredRef.current = false; // السماح بإعادة المحاولة
-        }
-      });
-    }
-  }, [asset, usdValue, savedInvestment, isSelling, toast, checkCounter]);
+  }, [asset, savedInvestment, toast]);
   
   // إضافة مبلغ تعزيز جديد
   const handleAddBoost = (e: React.MouseEvent) => {
@@ -372,7 +320,7 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                   {getCoinTargetProfit(asset)}%
                 </span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-semibold">
                   💰 الهدف
                 </div>
@@ -380,6 +328,22 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                   ${((savedInvestment + totalBoost) * (1 + getCoinTargetProfit(asset) / 100)).toFixed(2)}
                 </span>
               </div>
+              {/* ⏳ حالة أمر Take Profit */}
+              {(() => {
+                const { getTakeProfitOrder } = require('@/services/takeProfitService');
+                const order = getTakeProfitOrder(asset);
+                if (order) {
+                  return (
+                    <div className="mt-2 pt-2 border-t border-green-500/20">
+                      <div className="flex items-center gap-2 text-xs text-green-300">
+                        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                        <span>أمر Take Profit نشط عند ${order.targetPrice.toFixed(8)}</span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           ) : !isSoldOrDust && asset !== 'USDT' && (
             <div className="p-3 bg-gradient-to-r from-gray-500/10 to-slate-500/10 rounded-lg border border-gray-500/30">

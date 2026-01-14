@@ -566,6 +566,32 @@ export async function buyWithAmount(
     // 💸 خصم المبلغ من الرصيد المحفوظ
     deductFromCachedBalance(usdtAmount);
 
+    // 🎯 إنشاء أمر Take Profit تلقائياً بعد الشراء الناجح
+    try {
+      console.log(`🎯 إنشاء أمر Take Profit لـ ${cleanSymbol} عند ${targetProfit}%...`);
+      const { createTakeProfitOrder } = await import('./takeProfitService');
+      const quantity = parseFloat(data.executedQty || '0');
+      const buyPrice = parseFloat(avgPrice);
+      
+      if (quantity > 0 && buyPrice > 0) {
+        const takeProfitResult = await createTakeProfitOrder(
+          tradingSymbol,
+          quantity,
+          buyPrice,
+          targetProfit
+        );
+        
+        if (takeProfitResult.success) {
+          console.log(`✅ تم إنشاء أمر Take Profit بنجاح! Order ID: ${takeProfitResult.orderId}`);
+        } else {
+          console.warn(`⚠️ فشل إنشاء أمر Take Profit: ${takeProfitResult.error}`);
+        }
+      }
+    } catch (tpError: any) {
+      console.error('❌ خطأ في إنشاء أمر Take Profit:', tpError);
+      // لا نوقف العملية - الشراء نجح حتى لو فشل Take Profit
+    }
+
     return {
       success: true,
       orderId: data.orderId,
