@@ -16,6 +16,7 @@ import PortfolioRebalance from "./pages/PortfolioRebalance";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import Favorites from "./pages/Favorites";
 import TradeHistory from "./pages/TradeHistory";
+import ProfitCheck from "./pages/ProfitCheck";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/confirm-email" element={<ConfirmEmail />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/trade-history" element={<TradeHistory />} />
+            <Route path="/profit-check" element={<ProfitCheck />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
