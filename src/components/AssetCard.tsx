@@ -74,6 +74,15 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const autoSellTriggeredRef = useRef<boolean>(false);
   const [checkCounter, setCheckCounter] = useState<number>(0); // لإجبار الفحص الدوري
   
+  // ⏰ فحص دوري كل 30 ثانية
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCheckCounter(prev => prev + 1);
+    }, 30000); // 30 ثانية
+    
+    return () => clearInterval(interval);
+  }, []);
+  
   // 🔍 التحقق إذا كانت العملة مباعة أو غبار
   const currentValue = parseFloat(usdValue);
   const isSoldOrDust = isCoinSold(asset) || isDustCoin(currentValue);
@@ -109,120 +118,60 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     }
   }, [asset, isSoldOrDust]);
   
-  // ⏰ فحص دوري كل 30 ثانية لضمان عمل البيع التلقائي
+  // 🎯 البيع التلقائي عند الوصول لنسبة الربح المستهدفة
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCheckCounter(prev => prev + 1);
-    }, 30000); // كل 30 ثانية
+    // تخطي العملات المباعة أو الغبار أو USDT
+    if (isSoldOrDust || asset === 'USDT' || !savedInvestment || savedInvestment === 0) {
+      return;
+    }
     
-    return () => clearInterval(interval);
-  }, []);
-  
-  // 🔄 البيع التلقائي عند وصول الربح للنسبة المطلوبة
-  useEffect(() => {
-    if (asset === 'USDT' || savedInvestment <= 0 || autoSellTriggeredRef.current || isSelling) return;
+    // تخطي إذا تم التشغيل مسبقاً
+    if (autoSellTriggeredRef.current) {
+      return;
+    }
     
+    // التحقق من تفعيل البيع التلقائي
     const autoSellSettings = getAutoSellSettings();
-    const smartTradingSettings = getSmartTradingSettings();
-    
-    if (!autoSellSettings.enabled || !hasCredentials()) {
-      console.log(`⏭️ تخطي ${asset}: البيع التلقائي ${!autoSellSettings.enabled ? 'معطل' : 'لا توجد مفاتيح API'}`);
+    if (!autoSellSettings.enabled) {
       return;
     }
     
+    // حساب نسبة الربح الفعلية
     const currentValue = parseFloat(usdValue);
-    if (isNaN(currentValue) || currentValue <= 0) {
-      console.log(`⏭️ تخطي ${asset}: قيمة غير صحيحة $${usdValue}`);
-      return;
-    }
+    const actualProfitPercent = savedInvestment > 0 
+      ? ((currentValue - savedInvestment) / savedInvestment) * 100 
+      : 0;
     
-    const profitPercent = ((currentValue - savedInvestment) / savedInvestment) * 100;
+    // استخدام نسبة الربح المخصصة من Smart Trading
+    const targetPercent = savedTargetProfit > 0 ? savedTargetProfit : autoSellSettings.profitPercent;
     
-    // 🎯 استخدام نسبة التداول الذكي إذا كان مفعّلاً، وإلا استخدام النسبة الثابتة
-    // getCoinTargetProfit تجلب النسبة المحفوظة وقت الشراء لهذه العملة
-    const targetProfitPercent = smartTradingSettings.enabled 
-      ? getCoinTargetProfit(asset) 
-      : autoSellSettings.profitPercent;
+    console.log(`📊 ${asset}: الربح ${actualProfitPercent.toFixed(2)}% / المستهدف ${targetPercent}%`);
     
-    // طباعة حالة الفحص للتتبع
-    console.log(`🔍 فحص ${asset}: القيمة $${currentValue.toFixed(2)} | الاستثمار $${savedInvestment} | الربح ${profitPercent.toFixed(2)}% | المطلوب ${targetProfitPercent}%${smartTradingSettings.enabled ? ' (ذكي)' : ''}`);
-    
-    // التحقق من وصول الربح للنسبة المطلوبة
-    if (profitPercent >= targetProfitPercent) {
-      console.log(`🎯 ${asset} وصل للربح ${profitPercent.toFixed(2)}% (المطلوب: ${targetProfitPercent}%)`);
-      
-      // منع التكرار
+    // البيع عند الوصول للنسبة المستهدفة
+    if (actualProfitPercent >= targetPercent) {
+      console.log(`🎯 ${asset} وصل ${actualProfitPercent.toFixed(2)}% - بدء البيع التلقائي!`);
       autoSellTriggeredRef.current = true;
-      setIsSelling(true);
-      
-      // تنفيذ البيع
-      sellAsset(asset).then(result => {
-        setIsSelling(false);
-        const soldAmount = parseFloat(result.executedQty || '0');
-        const soldTotal = parseFloat(result.cummulativeQuoteQty || '0');
-        const profit = soldTotal - savedInvestment;
-        
-        if (result.success) {
-          toast({
-            title: `✅ تم بيع ${asset} بنجاح!`,
-            description: `تم تحويل ${result.executedQty} إلى ${result.cummulativeQuoteQty} USDT (ربح: $${profit.toFixed(2)})`,
-          });
-          
-          // 📜 حفظ في سجل العمليات
-          addSellRecord(
-            asset,
-            soldAmount,
-            soldTotal / soldAmount, // السعر
-            soldTotal,
-            profit,
-            profitPercent,
-            true
-          );
-          
-          // 🎯 تسجيل البيع في نظام التداول الذكي
-          if (smartTradingSettings.enabled) {
-            const sellResult = registerSell(asset, profit);
-            
-            toast({
-              title: `💰 تم البيع بنجاح!`,
-              description: `النسبة الجديدة للشراء التالي: ${sellResult.newProfitPercent}%`,
-            });
-            
-            // 🔄 تفعيل البحث التلقائي لبدء دورة جديدة
-            // إرسال حدث مخصص لتفعيل البحث
-            window.dispatchEvent(new CustomEvent('smart-trading-cycle-complete', {
-              detail: { newProfitPercent: sellResult.newProfitPercent }
-            }));
-          }
-          
-          // 🗑️ مسح بيانات الاستثمار بعد البيع الناجح فقط (مع تسجيل كعملة مباعة)
-          removeCoinInvestment(asset, true, soldTotal, profit);
-          setSavedInvestment(0);
-          setSavedTargetProfit(0);
-        } else {
-          toast({
-            title: `❌ فشل بيع ${asset}`,
-            description: result.error,
-            variant: "destructive",
-          });
-          
-          // 📜 حفظ العملية الفاشلة في السجل
-          addSellRecord(
-            asset,
-            0,
-            0,
-            0,
-            0,
-            0,
-            false,
-            result.error
-          );
-          
-          autoSellTriggeredRef.current = false; // السماح بإعادة المحاولة
-        }
-      });
+      handleAutoSell();
     }
-  }, [asset, usdValue, savedInvestment, isSelling, toast, checkCounter]);
+  }, [asset, usdValue, savedInvestment, savedTargetProfit, isSoldOrDust, checkCounter]);
+  
+  // وظيفة البيع التلقائي
+  const handleAutoSell = async () => {
+    if (isSelling || !hasCredentials()) return;
+    
+    setIsSelling(true);
+    try {
+      console.log(`💰 بيع تلقائي: ${asset}`);
+      await sellAsset(asset, parseFloat(balance));
+      toast.success(`تم بيع ${asset} تلقائياً بنجاح! 🎉`);
+    } catch (error: any) {
+      console.error('خطأ في البيع التلقائي:', error);
+      toast.error(`فشل البيع التلقائي: ${error.message}`);
+      autoSellTriggeredRef.current = false; // إعادة المحاولة
+    } finally {
+      setIsSelling(false);
+    }
+  };
   
   // إضافة مبلغ تعزيز جديد
   const handleAddBoost = (e: React.MouseEvent) => {
@@ -372,7 +321,7 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                   {getCoinTargetProfit(asset)}%
                 </span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-semibold">
                   💰 الهدف
                 </div>
