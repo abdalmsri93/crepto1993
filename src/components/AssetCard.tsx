@@ -74,6 +74,15 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   const autoSellTriggeredRef = useRef<boolean>(false);
   const [checkCounter, setCheckCounter] = useState<number>(0); // لإجبار الفحص الدوري
   
+  // ⏰ فحص دوري كل 30 ثانية
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCheckCounter(prev => prev + 1);
+    }, 30000); // 30 ثانية
+    
+    return () => clearInterval(interval);
+  }, []);
+  
   // 🔍 التحقق إذا كانت العملة مباعة أو غبار
   const currentValue = parseFloat(usdValue);
   const isSoldOrDust = isCoinSold(asset) || isDustCoin(currentValue);
@@ -109,9 +118,60 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
     }
   }, [asset, isSoldOrDust]);
   
-  // ❌ تم إلغاء نظام الفحص الدوري (30 ثانية) - استبدل بنظام Take Profit
-  // ✅ الآن بايننس نفسه يبيع تلقائياً عند الوصول للنسبة المحددة
-  // 🎯 Take Profit يتم إنشاؤه تلقائياً عند الشراء من binanceTrading.ts
+  // 🎯 البيع التلقائي عند الوصول لنسبة الربح المستهدفة
+  useEffect(() => {
+    // تخطي العملات المباعة أو الغبار أو USDT
+    if (isSoldOrDust || asset === 'USDT' || !savedInvestment || savedInvestment === 0) {
+      return;
+    }
+    
+    // تخطي إذا تم التشغيل مسبقاً
+    if (autoSellTriggeredRef.current) {
+      return;
+    }
+    
+    // التحقق من تفعيل البيع التلقائي
+    const autoSellSettings = getAutoSellSettings();
+    if (!autoSellSettings.enabled) {
+      return;
+    }
+    
+    // حساب نسبة الربح الفعلية
+    const currentValue = parseFloat(usdValue);
+    const actualProfitPercent = savedInvestment > 0 
+      ? ((currentValue - savedInvestment) / savedInvestment) * 100 
+      : 0;
+    
+    // استخدام نسبة الربح المخصصة من Smart Trading
+    const targetPercent = savedTargetProfit > 0 ? savedTargetProfit : autoSellSettings.profitPercent;
+    
+    console.log(`📊 ${asset}: الربح ${actualProfitPercent.toFixed(2)}% / المستهدف ${targetPercent}%`);
+    
+    // البيع عند الوصول للنسبة المستهدفة
+    if (actualProfitPercent >= targetPercent) {
+      console.log(`🎯 ${asset} وصل ${actualProfitPercent.toFixed(2)}% - بدء البيع التلقائي!`);
+      autoSellTriggeredRef.current = true;
+      handleAutoSell();
+    }
+  }, [asset, usdValue, savedInvestment, savedTargetProfit, isSoldOrDust, checkCounter]);
+  
+  // وظيفة البيع التلقائي
+  const handleAutoSell = async () => {
+    if (isSelling || !hasCredentials()) return;
+    
+    setIsSelling(true);
+    try {
+      console.log(`💰 بيع تلقائي: ${asset}`);
+      await sellAsset(asset, parseFloat(balance));
+      toast.success(`تم بيع ${asset} تلقائياً بنجاح! 🎉`);
+    } catch (error: any) {
+      console.error('خطأ في البيع التلقائي:', error);
+      toast.error(`فشل البيع التلقائي: ${error.message}`);
+      autoSellTriggeredRef.current = false; // إعادة المحاولة
+    } finally {
+      setIsSelling(false);
+    }
+  };
   
   // إضافة مبلغ تعزيز جديد
   const handleAddBoost = (e: React.MouseEvent) => {
