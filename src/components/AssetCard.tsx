@@ -112,12 +112,78 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
   // ❌ تم إلغاء نظام الفحص الدوري (30 ثانية) - استبدل بنظام Take Profit
   // ✅ الآن بايننس نفسه يبيع تلقائياً عند الوصول للنسبة المحددة
   
+  // 🎯 إنشاء Take Profit تلقائياً للعملات الموجودة (بدون أمر)
+  useEffect(() => {
+    const createMissingTakeProfit = async () => {
+      // تخطي USDT والعملات المباعة والعملات بدون استثمار
+      if (asset === 'USDT' || isSoldOrDust || !savedInvestment || savedInvestment <= 0) {
+        return;
+      }
+      
+      const { getTakeProfitOrder, createTakeProfitOrder } = await import('@/services/takeProfitService');
+      
+      // فحص إذا يوجد أمر Take Profit
+      const existingOrder = getTakeProfitOrder(asset);
+      if (existingOrder) {
+        console.log(`✅ ${asset} عنده أمر Take Profit موجود`);
+        return;
+      }
+      
+      // الحصول على الكمية المملوكة
+      const quantity = parseFloat(amount);
+      if (!quantity || quantity <= 0) {
+        console.log(`⏭️ تخطي ${asset}: كمية غير صحيحة`);
+        return;
+      }
+      
+      // الحصول على سعر الشراء الأصلي
+      const currentPrice = parseFloat(usdValue) / quantity;
+      const buyPrice = savedInvestment / quantity;
+      
+      if (!buyPrice || buyPrice <= 0) {
+        console.log(`⏭️ تخطي ${asset}: سعر شراء غير صحيح`);
+        return;
+      }
+      
+      // الحصول على النسبة المستهدفة
+      const targetPercent = getCoinTargetProfit(asset);
+      
+      console.log(`🎯 إنشاء Take Profit تلقائي لـ ${asset}:`);
+      console.log(`   - الكمية: ${quantity}`);
+      console.log(`   - سعر الشراء: $${buyPrice.toFixed(8)}`);
+      console.log(`   - النسبة المستهدفة: ${targetPercent}%`);
+      
+      // إنشاء أمر Take Profit
+      const tradingSymbol = asset.endsWith('USDT') ? asset : `${asset}USDT`;
+      const result = await createTakeProfitOrder(
+        tradingSymbol,
+        quantity,
+        buyPrice,
+        targetPercent
+      );
+      
+      if (result.success) {
+        console.log(`✅ تم إنشاء Take Profit لـ ${asset}!`);
+        toast({
+          title: `🎯 تم إنشاء Take Profit`,
+          description: `${asset} سيُباع تلقائياً عند ${targetPercent}%`,
+        });
+      } else {
+        console.error(`❌ فشل إنشاء Take Profit لـ ${asset}:`, result.error);
+      }
+    };
+    
+    // تأخير بسيط لتجنب تحميل كل العملات دفعة واحدة
+    const timeout = setTimeout(createMissingTakeProfit, 2000);
+    return () => clearTimeout(timeout);
+  }, [asset, savedInvestment, amount, usdValue, isSoldOrDust, toast]);
+  
   // 🔍 فحص حالة أمر Take Profit كل دقيقة (للتحديث فقط)
   useEffect(() => {
     const interval = setInterval(async () => {
       const { getTakeProfitOrder, checkOrderStatus, deleteTakeProfitOrder } = await import('@/services/takeProfitService');
       const { registerSell } = await import('@/services/smartTradingService');
-      const { removeCoinInvestment } = await import('@/services/coinInvestmentService');
+      const { removeCoinInvestment } = await import('@/services/investmentBackupService');
       
       const order = getTakeProfitOrder(asset);
       if (!order) return;
@@ -328,22 +394,6 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                   ${((savedInvestment + totalBoost) * (1 + getCoinTargetProfit(asset) / 100)).toFixed(2)}
                 </span>
               </div>
-              {/* ⏳ حالة أمر Take Profit */}
-              {(() => {
-                const { getTakeProfitOrder } = require('@/services/takeProfitService');
-                const order = getTakeProfitOrder(asset);
-                if (order) {
-                  return (
-                    <div className="mt-2 pt-2 border-t border-green-500/20">
-                      <div className="flex items-center gap-2 text-xs text-green-300">
-                        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                        <span>أمر Take Profit نشط عند ${order.targetPrice.toFixed(8)}</span>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
             </div>
           ) : !isSoldOrDust && asset !== 'USDT' && (
             <div className="p-3 bg-gradient-to-r from-gray-500/10 to-slate-500/10 rounded-lg border border-gray-500/30">

@@ -1,7 +1,5 @@
 // 🎯 خدمة إدارة أوامر Take Profit - للبيع التلقائي بنسبة دقيقة
 
-import { createHmac } from 'crypto-browserify';
-
 interface TakeProfitOrder {
   symbol: string;
   orderId: number;
@@ -20,11 +18,25 @@ const getApiKeys = () => {
   return { apiKey, apiSecret };
 };
 
-// 🔒 توقيع الطلب
-const signRequest = (queryString: string, apiSecret: string): string => {
-  return createHmac('sha256', apiSecret)
-    .update(queryString)
-    .digest('hex');
+// 🔒 توقيع الطلب باستخدام Web Crypto API
+const signRequest = async (queryString: string, apiSecret: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(apiSecret);
+  const messageData = encoder.encode(queryString);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, messageData);
+  
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 };
 
 // 💾 حفظ أمر Take Profit في localStorage
@@ -95,7 +107,7 @@ export const createTakeProfitOrder = async (
     });
 
     // 🔐 توقيع الطلب
-    const signature = signRequest(params.toString(), apiSecret);
+    const signature = await signRequest(params.toString(), apiSecret);
     params.append('signature', signature);
 
     // 📤 إرسال الطلب لبايننس
@@ -224,7 +236,7 @@ export const cancelTakeProfitOrder = async (
       timestamp: timestamp.toString(),
     });
 
-    const signature = signRequest(params.toString(), apiSecret);
+    const signature = await signRequest(params.toString(), apiSecret);
     params.append('signature', signature);
 
     const response = await fetch(
