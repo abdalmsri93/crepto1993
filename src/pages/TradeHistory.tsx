@@ -17,7 +17,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { getTradeHistory, getTradeStats, clearTradeHistory, clearAllTradingData, TradeRecord } from "@/services/tradeHistory";
 import { useToast } from "@/hooks/use-toast";
-import { getCoinInvestment } from "@/services/investmentBackupService";
+import { getCoinInvestment, isCoinSold } from "@/services/investmentBackupService";
 import { getCoinTargetProfit } from "@/services/smartTradingService";
 
 const TradeHistory = () => {
@@ -62,6 +62,13 @@ const TradeHistory = () => {
 
   const filteredHistory = history.filter(record => {
     if (filter === 'all') return true;
+    
+    // فلتر الشراء: فقط العملات المشتراة ولم تُبع
+    if (filter === 'buy') {
+      return record.type === 'buy' && !isCoinSold(record.asset);
+    }
+    
+    // فلتر البيع: كل عمليات البيع
     return record.type === filter;
   });
 

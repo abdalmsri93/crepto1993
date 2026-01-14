@@ -276,6 +276,7 @@ export const assignProfitPercentsToExistingCoins = (coins: string[]): void => {
  * تسجيل عملية شراء جديدة مع حفظ نسبة البيع
  */
 export const registerBuy = (coinSymbol: string): void => {
+  const settings = getSmartTradingSettings();
   const state = getSmartTradingState();
   const pendingCoins = [...state.pendingCoins];
   
@@ -286,10 +287,24 @@ export const registerBuy = (coinSymbol: string): void => {
     const currentPercent = state.currentProfitPercent;
     saveCoinTargetProfit(coinSymbol, currentPercent);
     
-    console.log(`🛒 تم تسجيل شراء ${coinSymbol} بنسبة بيع ${currentPercent}% - العملات المعلقة: ${pendingCoins.length}`);
+    console.log(`🛒 تم تسجيل شراء ${coinSymbol} بنسبة بيع ${currentPercent}%`);
+    
+    // ✅ زيادة النسبة للعملة القادمة (+2%)
+    let newProfitPercent = currentPercent + settings.profitIncrement;
+    
+    // إذا تجاوزت الحد الأقصى، ترجع للبداية
+    if (newProfitPercent > settings.maxProfitPercent) {
+      newProfitPercent = settings.startProfitPercent;
+      console.log(`🔄 النسبة وصلت ${settings.maxProfitPercent}% - ترجع لـ ${settings.startProfitPercent}%`);
+    }
+    
+    console.log(`📈 النسبة للعملة القادمة: ${newProfitPercent}%`);
     
     // ✅ تحديث الحالة
-    saveSmartTradingState({ pendingCoins });
+    saveSmartTradingState({ 
+      pendingCoins,
+      currentProfitPercent: newProfitPercent  // ← النسبة تزيد عند الشراء
+    });
   }
 };
 
@@ -300,7 +315,6 @@ export const registerSell = (coinSymbol: string, profit: number): {
   cycleCompleted: boolean;
   newProfitPercent: number;
 } => {
-  const settings = getSmartTradingSettings();
   const state = getSmartTradingState();
   
   // إزالة العملة من المعلقة
@@ -312,35 +326,25 @@ export const registerSell = (coinSymbol: string, profit: number): {
   // 💰 زيادة إجمالي الربح
   const totalProfit = state.totalProfit + profit;
   
-  // 🎯 زيادة النسبة بعد كل عملية بيع (+2%)
-  let newProfitPercent = state.currentProfitPercent + settings.profitIncrement;
-  
-  // إذا تجاوزت الحد الأقصى، ترجع للبداية
-  if (newProfitPercent > settings.maxProfitPercent) {
-    newProfitPercent = settings.startProfitPercent;
-    console.log(`🔄 النسبة وصلت ${settings.maxProfitPercent}% - ترجع لـ ${settings.startProfitPercent}%`);
-  }
-  
   const newCycle = state.currentCycle + 1;
   const totalCyclesCompleted = state.totalCyclesCompleted + 1;
   
-  console.log(`🎉 تم بيع ${coinSymbol}! النسبة القديمة: ${state.currentProfitPercent}% → النسبة الجديدة: ${newProfitPercent}%`);
+  console.log(`🎉 تم بيع ${coinSymbol}! الربح: $${profit.toFixed(2)}`);
   
-  // ✅ حفظ الحالة الجديدة فوراً
+  // ✅ حفظ الحالة الجديدة (النسبة لا تتغير عند البيع)
   saveSmartTradingState({
     pendingCoins,
     soldInCurrentCycle: 0,
-    currentProfitPercent: newProfitPercent,  // ← النسبة الجديدة للعملة القادمة
     currentCycle: newCycle,
     totalCyclesCompleted,
     totalProfit,
   });
   
-  console.log(`💰 الربح: $${profit.toFixed(2)} | النسبة التالية: ${newProfitPercent}% | الدورة: #${newCycle}`);
+  console.log(`💰 إجمالي الربح: $${totalProfit.toFixed(2)} | الدورة: #${newCycle}`);
   
   return {
     cycleCompleted: true,
-    newProfitPercent,
+    newProfitPercent: state.currentProfitPercent,  // ← النسبة لا تتغير عند البيع
   };
 };
 
