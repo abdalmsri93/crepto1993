@@ -553,18 +553,34 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
       if (smartSettings.enabled) {
         addLog('info', `🎯 نظام التداول الذكي مفعّل - الدورة ${smartState.currentCycle} - النسبة ${smartState.currentProfitPercent}%`);
         
+        // ✅ التحقق من Binance API Keys
+        if (!hasCredentials()) {
+          addLog('error', `⛔ لا توجد مفاتيح Binance API - إيقاف البحث التلقائي`);
+          addLog('warning', `💡 يرجى إضافة API Keys من الإعدادات أولاً`);
+          setStatus(prev => ({ ...prev, isSearching: false }));
+          // إيقاف البحث تلقائياً
+          stopAutoSearch();
+          return;
+        }
+        
         // التحقق من الرصيد الكافي لعملة واحدة على الأقل
         if (usdtBalance < smartSettings.buyAmount) {
-          addLog('warning', `⛔ الرصيد غير كافي! متوفر: $${usdtBalance.toFixed(2)} - مطلوب: $${smartSettings.buyAmount}`);
+          addLog('error', `⛔ الرصيد غير كافي! متوفر: $${usdtBalance.toFixed(2)} - مطلوب: $${smartSettings.buyAmount}`);
+          addLog('warning', `💡 البحث متوقف حتى يصبح الرصيد كافياً - إيقاف البحث التلقائي`);
           setStatus(prev => ({ ...prev, isSearching: false }));
+          // إيقاف البحث تلقائياً
+          stopAutoSearch();
           return;
         }
         
         // التحقق من المحفظة (الحد الأقصى 50 عملة)
         const portfolioCoins = getPortfolioCoinsCount();
         if (portfolioCoins >= smartSettings.maxPortfolioCoins) {
-          addLog('warning', `⛔ المحفظة ممتلئة! ${portfolioCoins}/${smartSettings.maxPortfolioCoins} - انتظر البيع`);
+          addLog('error', `⛔ المحفظة ممتلئة! ${portfolioCoins}/${smartSettings.maxPortfolioCoins} عملة`);
+          addLog('warning', `💡 انتظر حتى يتم بيع بعض العملات - إيقاف البحث التلقائي`);
           setStatus(prev => ({ ...prev, isSearching: false }));
+          // إيقاف البحث تلقائياً
+          stopAutoSearch();
           return;
         }
         
