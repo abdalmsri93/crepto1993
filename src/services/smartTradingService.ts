@@ -287,7 +287,7 @@ export const registerBuy = (coinSymbol: string): void => {
     const currentPercent = state.currentProfitPercent;
     saveCoinTargetProfit(coinSymbol, currentPercent);
     
-    console.log(`🛒 تم تسجيل شراء ${coinSymbol} بنسبة بيع ${currentPercent}% - العملات المعلقة: ${pendingCoins.length}`);
+    console.log(`🛒 تم تسجيل شراء ${coinSymbol} بنسبة بيع ${currentPercent}%`);
     
     // ✅ زيادة النسبة للعملة القادمة (+2%)
     let newProfitPercent = currentPercent + settings.profitIncrement;
@@ -298,12 +298,12 @@ export const registerBuy = (coinSymbol: string): void => {
       console.log(`🔄 النسبة وصلت ${settings.maxProfitPercent}% - ترجع لـ ${settings.startProfitPercent}%`);
     }
     
-    console.log(`📈 النسبة القادمة للشراء التالي: ${newProfitPercent}%`);
+    console.log(`📈 النسبة للعملة القادمة: ${newProfitPercent}%`);
     
-    // ✅ تحديث الحالة مع النسبة الجديدة
+    // ✅ تحديث الحالة
     saveSmartTradingState({ 
       pendingCoins,
-      currentProfitPercent: newProfitPercent
+      currentProfitPercent: newProfitPercent  // ← النسبة تزيد عند الشراء
     });
   }
 };
@@ -315,7 +315,6 @@ export const registerSell = (coinSymbol: string, profit: number): {
   cycleCompleted: boolean;
   newProfitPercent: number;
 } => {
-  const settings = getSmartTradingSettings();
   const state = getSmartTradingState();
   
   // إزالة العملة من المعلقة
@@ -332,7 +331,7 @@ export const registerSell = (coinSymbol: string, profit: number): {
   
   console.log(`🎉 تم بيع ${coinSymbol}! الربح: $${profit.toFixed(2)}`);
   
-  // ✅ حفظ الحالة الجديدة - النسبة لا تتغير في البيع
+  // ✅ حفظ الحالة الجديدة (النسبة لا تتغير عند البيع)
   saveSmartTradingState({
     pendingCoins,
     soldInCurrentCycle: 0,
@@ -341,11 +340,11 @@ export const registerSell = (coinSymbol: string, profit: number): {
     totalProfit,
   });
   
-  console.log(`💰 إجمالي الربح: $${totalProfit.toFixed(2)} | النسبة الحالية للشراء القادم: ${state.currentProfitPercent}% | الدورة: #${newCycle}`);
+  console.log(`💰 إجمالي الربح: $${totalProfit.toFixed(2)} | الدورة: #${newCycle}`);
   
   return {
     cycleCompleted: true,
-    newProfitPercent: state.currentProfitPercent, // النسبة الحالية لم تتغير
+    newProfitPercent: state.currentProfitPercent,  // ← النسبة لا تتغير عند البيع
   };
 };
 
