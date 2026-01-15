@@ -2,6 +2,7 @@
  * 🔄 Context البحث التلقائي - يعمل في الخلفية دائماً
  * لا يتوقف عند تغيير الصفحات
  * ✅ يستخدم نفس معايير البحث اليدوي
+ * 🛡️ يتضمن فلاتر أمان للحماية من العملات المشبوهة
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -19,6 +20,13 @@ import {
 } from '@/services/smartTradingService';
 import { buyWithAmount, hasCredentials, getAutoBuySettings, getAccountBalance, getUSDTBalance, getCachedUSDTBalance } from '@/services/binanceTrading';
 import { addBuyRecord } from '@/services/tradeHistory';
+// 🛡️ استيراد خدمة التحقق من العملات
+import { 
+  quickVerifyCoin, 
+  verifyCoinOnCoinGecko, 
+  WHITELIST_COINS, 
+  EXTENDED_BLACKLIST 
+} from '@/services/coinVerificationService';
 
 // 🔧 دالة لحساب معايير Binance تلقائياً (نفس البحث اليدوي)
 function calculateBinanceMetrics(ticker: any) {
@@ -73,13 +81,8 @@ const PRICE_RANGE_BY_PROFIT: { [key: number]: number } = {
   15: 0.20,   // نسبة 15% → سعر حتى $0.20
 };
 
-// 🚫 القائمة السوداء - عملات تجنبها (مشاكل سابقة أو stablecoins)
-const BLACKLIST: string[] = [
-  'LUNA', 'LUNC', 'UST', 'USTC',  // انهيار Terra
-  'FTT', 'SRM',                     // انهيار FTX
-  'BUSD', 'TUSD', 'PAX', 'USDP', 'GUSD', 'DAI', 'USDC', 'FDUSD', // Stablecoins
-  'WBTC', 'WETH', 'STETH',         // Wrapped tokens
-];
+// 🚫 القائمة السوداء - نستخدم القائمة الموسعة من coinVerificationService
+const BLACKLIST: string[] = EXTENDED_BLACKLIST;
 
 // 📊 حدود تغير السعر 24 ساعة
 const PRICE_CHANGE_LIMITS = {
@@ -332,7 +335,31 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
     );
     console.log(`بعد فلتر مستوى المخاطرة: ${coins.length}`);
     
-    // 9. ترتيب ذكي: الأولوية للعملات المستقرة/الهابطة قليلاً ثم درجة الأداء
+    // 9. 🛡️ فلتر الأمان - استبعاد العملات المشبوهة
+    coins = coins.filter(coin => {
+      const check = quickVerifyCoin(coin.symbol);
+      if (!check.safe) {
+        console.log(`🛡️ مستبعد (${check.reason}): ${coin.symbol}`);
+        return false;
+      }
+      return true;
+    });
+    console.log(`🛡️ بعد فلتر الأمان: ${coins.length}`);
+    
+    // 10. 🌟 أولوية للعملات الموثوقة (القائمة البيضاء)
+    coins.sort((a, b) => {
+      const isWhitelistA = WHITELIST_COINS.includes(a.symbol.toUpperCase());
+      const isWhitelistB = WHITELIST_COINS.includes(b.symbol.toUpperCase());
+      
+      // العملات الموثوقة تأتي أولاً
+      if (isWhitelistA && !isWhitelistB) return -1;
+      if (!isWhitelistA && isWhitelistB) return 1;
+      
+      return 0; // الترتيب الأصلي للباقي
+    });
+    console.log(`🌟 تم ترتيب العملات (الموثوقة أولاً)`);
+    
+    // 11. ترتيب ذكي: الأولوية للعملات المستقرة/الهابطة قليلاً ثم درجة الأداء
     coins.sort((a, b) => {
       const changeA = a.priceChange24h || 0;
       const changeB = b.priceChange24h || 0;
@@ -651,17 +678,17 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
           const geminiResult = analysis.gemini.recommended ? '✅ نعم' : '❌ لا';
           addLog('info', `  ChatGPT: ${chatgptResult} | Gemini: ${geminiResult}`, coin.symbol);
           
-          // شرط الإضافة: أحدهما على الأقل (معدّل ليكون أقل صرامة)
+          // شرط الإضافة: كلاهما يجب أن يوافق (تشديد الفلتر)
           const bothRecommend = analysis.chatgpt.recommended && analysis.gemini.recommended;
           const atLeastOne = analysis.chatgpt.recommended || analysis.gemini.recommended;
           
-          // قبول رأي واحد على الأقل من أي AI
-          const shouldAdd = atLeastOne;
+          // ✅ يجب موافقة كلا الـ AI للشراء
+          const shouldAdd = bothRecommend;
           
           addLog('info', `📊 نتيجة التحليل: bothRecommend=${bothRecommend}, atLeastOne=${atLeastOne}, shouldAdd=${shouldAdd}`, coin.symbol);
           
           if (shouldAdd) {
-            const reason = bothRecommend ? 'كلاهما ينصح!' : 'أحدهما ينصح';
+            const reason = 'كلا الـ AI يوافقان! ✅✅';
             addLog('success', `✨ ${reason}`, coin.symbol);
             
             addLog('info', `📝 محاولة إضافة ${coin.symbol} للمفضلات...`, coin.symbol);
@@ -676,6 +703,32 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
               
               // 🎯 تنفيذ الشراء الفعلي
               if (smartSettings.enabled && hasCredentials()) {
+                // 🛡️ فحص أمان أخير قبل الشراء
+                const securityCheck = quickVerifyCoin(coin.symbol);
+                if (!securityCheck.safe) {
+                  addLog('error', `🛡️ تم إيقاف الشراء - ${securityCheck.reason}`, coin.symbol);
+                  addedInCycle--;
+                  continue;
+                }
+                
+                // 🌐 تحقق إضافي من CoinGecko للعملات غير الموثوقة
+                if (!WHITELIST_COINS.includes(coin.symbol.toUpperCase())) {
+                  addLog('info', `🔍 التحقق من ${coin.symbol} على CoinGecko...`, coin.symbol);
+                  try {
+                    const cgVerification = await verifyCoinOnCoinGecko(coin.symbol);
+                    if (!cgVerification.verified) {
+                      addLog('error', `🛡️ تم إيقاف الشراء - ${cgVerification.reason}`, coin.symbol);
+                      addedInCycle--;
+                      continue;
+                    }
+                    addLog('success', `✅ ${cgVerification.reason}`, coin.symbol);
+                  } catch (verifyError) {
+                    addLog('warning', `⚠️ تعذر التحقق من CoinGecko - متابعة بحذر`, coin.symbol);
+                  }
+                } else {
+                  addLog('info', `✅ عملة موثوقة (قائمة بيضاء)`, coin.symbol);
+                }
+                
                 const buyAmount = smartSettings.buyAmount;
                 addLog('info', `💰 مبلغ الشراء المحدد: $${buyAmount}`, coin.symbol);
                 let buySuccess = false;
