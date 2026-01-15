@@ -10,7 +10,7 @@ import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X, Play,
 import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/NavLink";
 import { useAutoSearch } from "@/contexts/AutoSearchContext";
-import { assignProfitPercentsToExistingCoins } from "@/services/smartTradingService";
+import { assignProfitPercentsToExistingCoins, sortCoinsByProfitPercent } from "@/services/smartTradingService";
 import { addBuyRecord, getTradeHistory } from "@/services/tradeHistory";
 import { DUST_THRESHOLD } from "@/services/investmentBackupService";
 import { updateCachedBalance } from "@/services/binanceTrading";
@@ -501,6 +501,8 @@ const Index = () => {
               const filteredBalances = portfolio.balances.filter(
                 balance => parseFloat(balance.usdValue) >= DUST_THRESHOLD
               );
+              // 📊 ترتيب العملات تصاعدياً حسب نسبة البيع
+              const sortedBalances = sortCoinsByProfitPercent(filteredBalances);
               const dustCount = portfolio.balances.length - filteredBalances.length;
               
               return (
@@ -517,7 +519,7 @@ const Index = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredBalances.map((balance, index) => (
+                    {sortedBalances.map((balance, index) => (
                       <div 
                         key={balance.asset}
                         style={{ 

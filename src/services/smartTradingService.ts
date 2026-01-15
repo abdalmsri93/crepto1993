@@ -450,3 +450,21 @@ export const getPendingCoins = (): string[] => {
   const state = getSmartTradingState();
   return state.pendingCoins;
 };
+
+/**
+ * 🎯 ترتيب العملات حسب نسبة البيع تصاعدياً (من الأقل للأعلى)
+ * @param coins - قائمة العملات (مع asset و usdValue إلخ)
+ * @returns قائمة العملات مرتبة تصاعدياً حسب نسبة البيع
+ */
+export const sortCoinsByProfitPercent = <T extends { asset?: string; symbol?: string }>(coins: T[]): T[] => {
+  return [...coins].sort((a, b) => {
+    const symbolA = a.asset || a.symbol || '';
+    const symbolB = b.asset || b.symbol || '';
+    
+    const profitA = getCoinTargetProfit(symbolA);
+    const profitB = getCoinTargetProfit(symbolB);
+    
+    // ترتيب تصاعدي: من النسب الصغيرة للكبيرة
+    return profitA - profitB;
+  });
+};

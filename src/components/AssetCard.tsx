@@ -362,6 +362,19 @@ export const AssetCard = ({ asset, total, usdValue, priceChangePercent, currentP
                   </span>
                 </div>
               )}
+              
+              {/* 🎯 نسبة البيع المستهدفة */}
+              {asset !== 'USDT' && !isSoldOrDust && (
+                <div className="flex justify-between items-end pb-3 border-b border-green-500/30 hover:border-green-500/50 transition-colors bg-green-500/5 px-3 py-2.5 rounded-lg">
+                  <span className="text-green-400/90 text-sm font-medium flex items-center gap-1.5">
+                    🎯 نسبة البيع
+                  </span>
+                  <span className="font-orbitron text-green-400 font-bold text-lg group-hover:scale-110 transition-transform origin-right inline-block">
+                    {savedTargetProfit > 0 ? `${savedTargetProfit}%` : `${getCoinTargetProfit(asset)}%`}
+                  </span>
+                </div>
+              )}
+              
               <div className="flex justify-between items-end hover:bg-primary/5 px-2 py-2 rounded transition-colors">
                 <span className="text-muted-foreground/80 text-sm font-medium">الكمية</span>
                 <span className="font-orbitron text-foreground font-semibold">
