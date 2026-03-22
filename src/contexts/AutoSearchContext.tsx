@@ -18,7 +18,7 @@ import {
   getCurrentProfitPercent,
   saveSmartTradingState
 } from '@/services/smartTradingService';
-import { buyWithAmount, hasCredentials, getAutoBuySettings, getAccountBalance, getUSDTBalance, getCachedUSDTBalance } from '@/services/binanceTrading';
+import { buyWithAmount, placeLimitSellOrder, hasCredentials, getAutoBuySettings, getAccountBalance, getUSDTBalance, getCachedUSDTBalance } from '@/services/binanceTrading';
 import { addBuyRecord } from '@/services/tradeHistory';
 // 🛡️ استيراد خدمة التحقق من العملات
 import { 
@@ -93,7 +93,50 @@ const PRICE_CHANGE_LIMITS = {
 };
 
 // 💰 الحد الأدنى لحجم التداول
-const MIN_VOLUME = 100000; // $100K (مرفوع من $50K)
+const MIN_VOLUME = 300000; // $300K — رفعناه لضمان سيولة حقيقية
+
+// 🏆 الحد الأدنى لـ Pre-Score لإرسال العملة للـ AI
+const MIN_PRE_SCORE = 5;
+
+// 📊 عدد أفضل العملات التي نرسلها للـ AI بعد الفلترة
+const TOP_COINS_FOR_AI = 8;
+
+// حساب Pre-Score لكل عملة قبل AI (0-10)
+function calculatePreScore(ticker: any): number {
+  let score = 0;
+  const volume24h = parseFloat(ticker.quoteVolume || 0);
+  const priceChange = parseFloat(ticker.priceChangePercent || 0);
+  const high24h = parseFloat(ticker.highPrice || 0);
+  const low24h = parseFloat(ticker.lowPrice || 0);
+  const lastPrice = parseFloat(ticker.lastPrice || 0);
+  const numTrades = parseInt(ticker.count || 0);
+
+  // 1. نقاط الحجم (0-3): حجم عالٍ = سيولة وثقة أعلى
+  if (volume24h >= 5_000_000) score += 3;
+  else if (volume24h >= 1_000_000) score += 2;
+  else if (volume24h >= 300_000) score += 1;
+
+  // 2. نقاط تغير السعر (0-2): نريد تغيراً هادئاً سلبياً قليلاً أو صفرياً
+  if (priceChange >= -3 && priceChange <= 1) score += 2;       // مثالي
+  else if (priceChange >= -5 && priceChange <= 2.5) score += 1; // مقبول
+
+  // 3. نقاط الموضع في النطاق اليومي (0-2): قريب من القاع = أفضل للشراء
+  if (high24h > low24h && lastPrice > 0) {
+    const rangePos = ((lastPrice - low24h) / (high24h - low24h)) * 100;
+    if (rangePos <= 25) score += 2;       // في ربع القاع — فرصة قوية
+    else if (rangePos <= 45) score += 1;  // أقل من المنتصف
+  }
+
+  // 4. نقاط عدد الصفقات (0-2): صفقات كثيرة = اهتمام حقيقي
+  if (numTrades >= 10000) score += 2;
+  else if (numTrades >= 3000) score += 1;
+
+  // 5. بونص القائمة البيضاء (0-1)
+  const symbol = ticker.symbol.replace('USDT', '');
+  if (WHITELIST_COINS.includes(symbol.toUpperCase())) score += 1;
+
+  return Math.min(10, score);
+}
 
 // مفاتيح localStorage
 const AUTO_SEARCH_KEY = 'auto_search_settings';
@@ -257,7 +300,7 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
     });
     console.log(`📈 بعد فلتر السعر: ${priceFilteredCoins.length}`);
     
-    // 4. فلترة حجم التداول (>= $100,000) - مرفوع من $50K
+    // 4. فلترة حجم التداول
     const volumeFilteredCoins = priceFilteredCoins.filter((t: any) => {
       const volume = parseFloat(t.quoteVolume || 0);
       return volume >= MIN_VOLUME;
@@ -295,14 +338,15 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
     });
     console.log(`📊 بعد فلتر تغير السعر (-10% إلى +15%): ${priceChangeFilteredCoins.length}`);
     
-    // 6. تحويل لصيغة SearchCoin مع حساب المعايير
+    // 6. تحويل لصيغة SearchCoin مع حساب المعايير + Pre-Score
     let coins: SearchCoin[] = priceChangeFilteredCoins.map((ticker: any) => {
       const price = parseFloat(ticker.lastPrice);
       const quoteVolume = parseFloat(ticker.quoteVolume || 0);
       const symbol = ticker.symbol.replace('USDT', '');
       const priceChangePercent = parseFloat(ticker.priceChangePercent);
       const metrics = calculateBinanceMetrics(ticker);
-      
+      const preScore = calculatePreScore(ticker);
+
       return {
         symbol: symbol,
         name: symbol,
@@ -310,32 +354,36 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
         priceChange24h: priceChangePercent,
         volume24h: quoteVolume,
         volumePrice: quoteVolume,
-        marketCap: quoteVolume, // نستخدم الحجم كتقدير
+        marketCap: quoteVolume,
+        highPrice24h: ticker.highPrice,
+        lowPrice24h: ticker.lowPrice,
+        numTrades: parseInt(ticker.count || 0),
         rank: 0,
         category: 'Binance Direct',
-        score: metrics.performanceScore,
+        score: preScore,
         liquidity: metrics.liquidity,
         riskLevel: metrics.riskLevel,
         recommendation: metrics.recommendation,
         performanceScore: metrics.performanceScore,
+        preScore: preScore,
       };
     });
-    
+
     console.log(`✅ تم جلب ${coins.length} عملة من Binance بعد الفلاتر الأساسية`);
-    
-    // 7. فلترة السيولة (عالية أو متوسطة فقط)
-    coins = coins.filter(coin => 
+
+    // 7. فلترة السيولة
+    coins = coins.filter(coin =>
       coin.liquidity === "عالية" || coin.liquidity === "متوسطة"
     );
     console.log(`بعد فلتر السيولة: ${coins.length}`);
-    
-    // 8. فلترة مستوى المخاطرة (منخفض أو متوسط فقط)
-    coins = coins.filter(coin => 
+
+    // 8. فلترة مستوى المخاطرة
+    coins = coins.filter(coin =>
       coin.riskLevel === "منخفض" || coin.riskLevel === "متوسط"
     );
     console.log(`بعد فلتر مستوى المخاطرة: ${coins.length}`);
-    
-    // 9. 🛡️ فلتر الأمان - استبعاد العملات المشبوهة
+
+    // 9. 🛡️ فلتر الأمان
     coins = coins.filter(coin => {
       const check = quickVerifyCoin(coin.symbol);
       if (!check.safe) {
@@ -345,44 +393,28 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
       return true;
     });
     console.log(`🛡️ بعد فلتر الأمان: ${coins.length}`);
-    
-    // 10. 🌟 أولوية للعملات الموثوقة (القائمة البيضاء)
-    coins.sort((a, b) => {
-      const isWhitelistA = WHITELIST_COINS.includes(a.symbol.toUpperCase());
-      const isWhitelistB = WHITELIST_COINS.includes(b.symbol.toUpperCase());
-      
-      // العملات الموثوقة تأتي أولاً
-      if (isWhitelistA && !isWhitelistB) return -1;
-      if (!isWhitelistA && isWhitelistB) return 1;
-      
-      return 0; // الترتيب الأصلي للباقي
-    });
-    console.log(`🌟 تم ترتيب العملات (الموثوقة أولاً)`);
-    
-    // 11. ترتيب ذكي: الأولوية للعملات المستقرة/الهابطة قليلاً ثم درجة الأداء
-    coins.sort((a, b) => {
-      const changeA = a.priceChange24h || 0;
-      const changeB = b.priceChange24h || 0;
-      
-      // العملات في نطاق -10% إلى +3% تحصل على أولوية أعلى
-      const isIdealA = changeA >= PRICE_CHANGE_LIMITS.MIN && changeA <= PRICE_CHANGE_LIMITS.MAX;
-      const isIdealB = changeB >= PRICE_CHANGE_LIMITS.MIN && changeB <= PRICE_CHANGE_LIMITS.MAX;
-      
-      if (isIdealA && !isIdealB) return -1;
-      if (!isIdealA && isIdealB) return 1;
-      
-      // إذا كلاهما في النطاق المثالي أو خارجه، رتب حسب درجة الأداء
-      return (b.performanceScore || 0) - (a.performanceScore || 0);
-    });
-    
+
+    // 10. 🎯 فلتر Pre-Score — ترك العملات التي تستحق التحليل فقط
+    const beforePreScore = coins.length;
+    coins = coins.filter(coin => (coin.preScore || 0) >= MIN_PRE_SCORE);
+    console.log(`🎯 بعد فلتر Pre-Score (>=${MIN_PRE_SCORE}): ${coins.length} (تم حذف ${beforePreScore - coins.length})`);
+
+    // 11. 🏆 ترتيب بـ Pre-Score تنازلياً — الأفضل أولاً
+    coins.sort((a, b) => (b.preScore || 0) - (a.preScore || 0));
+    console.log(`🏆 ترتيب بـ Pre-Score — أعلى عملة: ${coins[0]?.symbol} (${coins[0]?.preScore}/10)`);
+
+    // 12. نأخذ أفضل TOP_COINS_FOR_AI فقط لإرسالها للـ AI
+    coins = coins.slice(0, TOP_COINS_FOR_AI);
+    console.log(`📤 تم اختيار أفضل ${coins.length} عملة للتحليل بالـ AI`);
+
     // إضافة الترتيب
     coins = coins.map((coin, index) => ({
       ...coin,
       rank: index + 1
     }));
-    
-    console.log(`✅ النتيجة النهائية: ${coins.length} عملة (الأولوية للعملات المستقرة)`);
-    
+
+    console.log(`✅ النتيجة النهائية: ${coins.length} عملة جاهزة للـ AI`);
+
     return coins;
   } catch (error: any) {
     console.error('❌ خطأ في جلب العملات:', error.message);
@@ -390,36 +422,41 @@ async function fetchAndFilterCoins(priceRange: { min: number; max: number }): Pr
   }
 }
 
-// اختيار عملات عشوائية مع التنويع (تجنب المكررات في المفضلة)
-function selectRandomCoins(coins: SearchCoin[], count: number): SearchCoin[] {
-  // جلب العملات الموجودة في المفضلة لتجنب التكرار
+// اختيار أفضل العملات بناءً على Pre-Score (بدون عشوائية)
+function selectTopCoins(coins: SearchCoin[], count: number): SearchCoin[] {
+  // جلب العملات الموجودة في المفضلة والمحفظة لتجنب التكرار
   const saved = localStorage.getItem(FAVORITES_KEY);
   const favorites: SearchCoin[] = saved ? JSON.parse(saved) : [];
   const existingSymbols = new Set(favorites.map(f => f.symbol));
-  
-  // استبعاد العملات الموجودة بالفعل
-  const availableCoins = coins.filter(coin => !existingSymbols.has(coin.symbol));
-  console.log(`🔄 التنويع: ${coins.length} عملة متاحة، ${existingSymbols.size} موجودة في المفضلة، ${availableCoins.length} جديدة`);
-  
+
+  // إضافة عملات المحفظة الحالية أيضاً
+  try {
+    const portfolioAssets = localStorage.getItem('binance_portfolio_assets');
+    if (portfolioAssets) {
+      const assets: string[] = JSON.parse(portfolioAssets);
+      assets.forEach(a => existingSymbols.add(a.toUpperCase()));
+    }
+  } catch {}
+
+  // استبعاد الموجودة
+  const availableCoins = coins.filter(coin => !existingSymbols.has(coin.symbol.toUpperCase()));
+  console.log(`🎯 اختيار ذكي: ${coins.length} مرشحة، ${existingSymbols.size} مستبعدة، ${availableCoins.length} جديدة`);
+
   if (availableCoins.length === 0) {
-    console.log(`⚠️ كل العملات موجودة بالفعل في المفضلة!`);
+    console.log(`⚠️ كل العملات موجودة بالفعل!`);
     return [];
   }
-  
-  if (availableCoins.length <= count) return availableCoins;
-  
-  const selected: SearchCoin[] = [];
-  const topHalf = Math.ceil(availableCoins.length / 2);
-  const topCoins = availableCoins.slice(0, topHalf);
-  
-  for (let i = 0; i < count && topCoins.length > 0; i++) {
-    const randomIndex = Math.floor(Math.random() * topCoins.length);
-    selected.push(topCoins[randomIndex]);
-    topCoins.splice(randomIndex, 1);
-  }
-  
+
+  // الأولوية للأعلى Pre-Score — بدون عشوائية
+  const sorted = [...availableCoins].sort((a, b) => (b.preScore || 0) - (a.preScore || 0));
+  const selected = sorted.slice(0, count);
+
+  console.log(`✅ تم اختيار: ${selected.map(c => `${c.symbol}(${c.preScore})`).join(', ')}`);
   return selected;
 }
+
+// للتوافق مع الكود القديم
+const selectRandomCoins = selectTopCoins;
 
 // إضافة للمفضلات
 function addToFavorites(coin: SearchCoin): boolean {
@@ -659,18 +696,23 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
         }
         
         setStatus(prev => ({ ...prev, currentCoin: coin.symbol }));
-        addLog('info', `🔎 تحليل ${coin.symbol}...`, coin.symbol);
+        addLog('info', `🔎 تحليل ${coin.symbol} — Pre-Score: ${coin.preScore ?? '?'}/10 | تغير: ${coin.priceChange24h !== undefined ? coin.priceChange24h.toFixed(2) + '%' : 'N/A'}`, coin.symbol);
         
         try {
           const analysis = await getDualAIAnalysis({
             symbol: coin.symbol,
             price: coin.price?.toString() || '0',
-            growth: coin.growth || '0%',
+            growth: coin.priceChange24h !== undefined ? `${coin.priceChange24h > 0 ? '+' : ''}${coin.priceChange24h.toFixed(2)}%` : (coin.growth || '0%'),
             riskLevel: coin.riskLevel || 'متوسط',
             liquidity: coin.liquidity || 'متوسطة',
             performanceScore: coin.performanceScore || 5,
-            marketCap: coin.marketCap || '0',
-            recommendation: ''
+            marketCap: coin.volume24h ? `$${(coin.volume24h / 1_000_000).toFixed(2)}M` : (coin.marketCap || '0'),
+            recommendation: coin.recommendation || '',
+            volume24h: coin.volume24h,
+            highPrice24h: (coin as any).highPrice24h,
+            lowPrice24h: (coin as any).lowPrice24h,
+            numTrades: (coin as any).numTrades,
+            preScore: coin.preScore,
           });
           
           // عرض تفاصيل التوصية
@@ -729,18 +771,21 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
                   addLog('info', `✅ عملة موثوقة (قائمة بيضاء)`, coin.symbol);
                 }
                 
-                const buyAmount = smartSettings.buyAmount;
-                addLog('info', `💰 مبلغ الشراء المحدد: $${buyAmount}`, coin.symbol);
                 let buySuccess = false;
-                
+                let buyAmount = 5; // سيُحسب من الرصيد الفعلي
+
                 // ⚡ جلب الرصيد الحقيقي قبل الشراء مباشرة
                 try {
                   addLog('info', `📡 جلب رصيد USDT من Binance API...`, coin.symbol);
                   const currentBalance = await getUSDTBalance();
                   addLog('info', `💰 رصيد USDT من API: $${currentBalance.toFixed(2)}`, coin.symbol);
-                  
+
+                  // 5% من الرصيد المتاح — حد أدنى $5، حد أقصى $200
+                  buyAmount = Math.min(200, Math.max(5, currentBalance * 0.05));
+                  addLog('info', `💰 مبلغ الشراء: $${buyAmount.toFixed(2)} (5% من $${currentBalance.toFixed(2)})`, coin.symbol);
+
                   if (currentBalance < buyAmount) {
-                    addLog('error', `⛔ الرصيد غير كافي! متوفر: $${currentBalance.toFixed(2)} - مطلوب: $${buyAmount}`, coin.symbol);
+                    addLog('error', `⛔ الرصيد غير كافي! متوفر: $${currentBalance.toFixed(2)} - مطلوب: $${buyAmount.toFixed(2)}`, coin.symbol);
                     addLog('info', `💡 سيتم المحاولة مرة أخرى في الدورة القادمة`, coin.symbol);
                     addedInCycle--;
                     continue;
@@ -765,7 +810,7 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
                   if (buyResult.success) {
                     buySuccess = true;
                     addLog('success', `✅ تم الشراء! الكمية: ${buyResult.executedQty}`, coin.symbol);
-                    
+
                     // 📜 تسجيل عملية الشراء في السجل
                     addBuyRecord(
                       coin.symbol,
@@ -774,14 +819,33 @@ export function AutoSearchProvider({ children }: { children: React.ReactNode }) 
                       buyAmount,
                       true
                     );
-                    
+
                     // تسجيل في نظام التداول الذكي
                     registerBuy(coin.symbol);
                     const currentProfitPercent = getCurrentProfitPercent();
                     addLog('info', `📈 نسبة البيع لهذه العملة: ${currentProfitPercent}%`, coin.symbol);
-                    
+
                     // حفظ مبلغ الاستثمار للعملة
                     localStorage.setItem(`investment_${coin.symbol}`, String(buyAmount));
+
+                    // 🎯 وضع Limit Sell Order على Binance
+                    // الأمر يبقى على Binance ويُنفَّذ تلقائياً حتى لو أُغلق المتصفح
+                    try {
+                      const avgPrice = parseFloat(buyResult.avgPrice || '0');
+                      const executedQty = parseFloat(buyResult.executedQty || '0');
+                      if (avgPrice > 0 && executedQty > 0) {
+                        const targetPrice = avgPrice * (1 + currentProfitPercent / 100);
+                        addLog('info', `🎯 وضع Limit Sell @ $${targetPrice.toFixed(6)} (هدف +${currentProfitPercent}%)`, coin.symbol);
+                        const limitResult = await placeLimitSellOrder(coin.symbol, executedQty, targetPrice);
+                        if (limitResult.success) {
+                          addLog('success', `✅ Limit Sell Order #${limitResult.orderId} — Binance سيبيع تلقائياً عند الهدف`, coin.symbol);
+                        } else {
+                          addLog('warning', `⚠️ تعذّر وضع Limit Sell: ${limitResult.error}`, coin.symbol);
+                        }
+                      }
+                    } catch (limitError: any) {
+                      addLog('warning', `⚠️ خطأ في Limit Sell: ${limitError.message}`, coin.symbol);
+                    }
                   } else {
                     addLog('error', `❌ فشل الشراء: ${buyResult.error}`, coin.symbol);
                     addLog('info', `💡 العملة ستبقى في المفضلات - سيتم المحاولة مرة أخرى`, coin.symbol);

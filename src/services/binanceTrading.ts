@@ -186,7 +186,7 @@ export async function sellAsset(asset: string, quantity?: number): Promise<Trade
 
     const response = await fetch(`${SUPABASE_URL}/functions/v1/binance-sell`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY },
       body: JSON.stringify({
         apiKey: credentials.apiKey,
         secretKey: credentials.secretKey,
@@ -258,7 +258,11 @@ export async function getAccountBalance(): Promise<AccountBalance[]> {
     
     const response = await fetch('https://dpxuacnrncwyopehwxsj.supabase.co/functions/v1/binance-portfolio', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
+      },
       body: JSON.stringify(requestBody)
     });
 
@@ -423,7 +427,7 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://dpxuacnrncwyopehwxsj.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRweHVhY25ybmN3eW9wZWh3eHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQyODUyNjIsImV4cCI6MjA0OTg2MTI2Mn0.cN5y3IvxZmE4aB0FXiWsN3h1sQT_m_OscmQCBtF7aXY';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRweHVhY25ybmN3eW9wZWh3eHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNTE1ODksImV4cCI6MjA4MjkyNzU4OX0.1AIdMc4COv30K-XUL3zU6wHAZ_1JlCaNKpmOY90AXRk';
 
 /**
  * إنشاء توقيع HMAC-SHA256 للمتصفح
@@ -587,6 +591,94 @@ export async function buyWithAmount(
       error: error.message || 'فشل تنفيذ التحويل',
       errorCode: error.code,
     };
+  }
+}
+
+/**
+ * وضع أمر Limit Sell على Binance بسعر الهدف
+ * الأمر يبقى على Binance ويُنفَّذ تلقائياً حتى لو أُغلق المتصفح
+ */
+export async function placeLimitSellOrder(
+  symbol: string,
+  quantity: number,
+  targetPrice: number
+): Promise<TradeResult> {
+  const credentials = getCredentials();
+  if (!credentials) {
+    return { success: false, error: 'لم يتم إعداد مفاتيح API' };
+  }
+
+  try {
+    const tradingSymbol = symbol.toUpperCase().endsWith('USDT')
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase().replace('USDT', '')}USDT`;
+
+    console.log(`🎯 وضع Limit Sell: ${tradingSymbol} | كمية: ${quantity} | سعر: ${targetPrice}`);
+
+    // جلب معلومات الرمز لضبط الكمية والسعر
+    const symbolInfo = await getSymbolInfo(tradingSymbol);
+    const stepSize = symbolInfo?.stepSize || 0.00001;
+    const tickSize = symbolInfo?.tickSize || 0.00001;
+    const minQty = symbolInfo?.minQty || 0.00001;
+
+    // ضبط الكمية حسب stepSize
+    const adjustedQty = Math.floor(quantity / stepSize) * stepSize;
+    if (adjustedQty < minQty) {
+      return { success: false, error: `الكمية أقل من الحد الأدنى (${minQty})` };
+    }
+
+    // ضبط السعر حسب tickSize
+    const adjustedPrice = Math.round(targetPrice / tickSize) * tickSize;
+
+    // تحضير الباراميترات
+    const timestamp = Date.now();
+    const params = new URLSearchParams({
+      symbol: tradingSymbol,
+      side: 'SELL',
+      type: 'LIMIT',
+      timeInForce: 'GTC',
+      quantity: adjustedQty.toFixed(8).replace(/\.?0+$/, ''),
+      price: adjustedPrice.toFixed(8).replace(/\.?0+$/, ''),
+      timestamp: timestamp.toString(),
+    });
+
+    const signature = await createSignature(params.toString(), credentials.secretKey);
+    params.append('signature', signature);
+
+    const response = await fetch(`/api/binance/api/v3/order?${params.toString()}`, {
+      method: 'POST',
+      headers: {
+        'X-MBX-APIKEY': credentials.apiKey,
+      },
+    });
+
+    const data = await response.json();
+    console.log('📥 Limit Sell Response:', data);
+
+    if (!response.ok || data.code) {
+      let errorMessage = data?.msg || 'فشل وضع أمر البيع';
+      if (data?.code === -1013) {
+        errorMessage = 'الكمية أو السعر خارج النطاق المسموح';
+      } else if (data?.code === -2010) {
+        errorMessage = 'رصيد غير كافٍ من العملة';
+      }
+      return { success: false, error: errorMessage, errorCode: data?.code };
+    }
+
+    console.log(`✅ تم وضع Limit Sell Order: #${data.orderId} على Binance`);
+
+    return {
+      success: true,
+      orderId: data.orderId,
+      symbol: tradingSymbol,
+      side: 'SELL',
+      executedQty: data.origQty,
+      avgPrice: adjustedPrice.toString(),
+      status: data.status,
+    };
+  } catch (error: any) {
+    console.error('❌ خطأ في Limit Sell:', error);
+    return { success: false, error: error.message || 'فشل وضع أمر البيع' };
   }
 }
 
@@ -776,6 +868,7 @@ export default {
   executeAutoBuy,
   bulkBuy,
   sellAsset,
+  placeLimitSellOrder,
   
   // Symbol Info
   getSymbolInfo,

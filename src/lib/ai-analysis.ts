@@ -10,6 +10,14 @@ interface CoinData {
   performanceScore: number;
   marketCap: string;
   recommendation: string;
+  // بيانات إضافية للتحليل الأعمق
+  volume24h?: number;
+  highPrice24h?: string;
+  lowPrice24h?: string;
+  priceChangeAbs?: string;
+  numTrades?: number;
+  preScore?: number;
+  volumeTrend?: 'rising' | 'falling' | 'stable';
 }
 
 interface AIRecommendation {
@@ -44,22 +52,56 @@ async function analyzeWithGroq(coinData: CoinData, model: string): Promise<AIRec
     };
   }
 
-  const prompt = `
-أنت خبير تحليل عملات رقمية. قم بتحليل هذه العملة وأعطِ توصية واضحة:
+  // حساب الموضع في النطاق اليومي
+  const price = parseFloat(coinData.price) || 0;
+  const high24h = parseFloat(coinData.highPrice24h || coinData.price) || price;
+  const low24h = parseFloat(coinData.lowPrice24h || coinData.price) || price;
+  const priceRange24h = high24h - low24h;
+  const positionInRange = priceRange24h > 0
+    ? Math.round(((price - low24h) / priceRange24h) * 100)
+    : 50;
 
-العملة: ${coinData.symbol}
-السعر: ${coinData.price}
-التغير (24h): ${coinData.growth}
-مستوى المخاطرة: ${coinData.riskLevel}
-السيولة: ${coinData.liquidity}
+  // تحليل اتجاه الحجم
+  const volumeTrendText = coinData.volumeTrend === 'rising'
+    ? '📈 متزايد (إشارة اهتمام)'
+    : coinData.volumeTrend === 'falling'
+    ? '📉 متناقص'
+    : '➡️ مستقر';
+
+  // تحليل الموضع السعري
+  const positionText = positionInRange <= 30
+    ? `قريب من القاع اليومي (${positionInRange}%) — فرصة محتملة`
+    : positionInRange >= 70
+    ? `قريب من القمة اليومية (${positionInRange}%) — احذر من الشراء عند القمة`
+    : `في المنتصف (${positionInRange}%)`;
+
+  const prompt = `أنت متداول محترف في العملات الرقمية. مهمتك تقييم فرصة الشراء قصير المدى (هدف ربح ${coinData.recommendation?.includes('%') ? coinData.recommendation : '3-15%'}).
+
+═══ بيانات ${coinData.symbol}/USDT ═══
+السعر الحالي: $${coinData.price}
+التغير 24h: ${coinData.growth}
+الأعلى/الأدنى 24h: $${coinData.highPrice24h || 'N/A'} / $${coinData.lowPrice24h || 'N/A'}
+الموضع السعري: ${positionText}
+حجم التداول 24h: $${coinData.volume24h ? (coinData.volume24h / 1000000).toFixed(2) + 'M' : coinData.marketCap}
+اتجاه الحجم: ${volumeTrendText}
+عدد الصفقات: ${coinData.numTrades ? coinData.numTrades.toLocaleString() : 'N/A'}
 درجة الأداء: ${coinData.performanceScore}/10
-حجم السوق: ${coinData.marketCap}
+السيولة: ${coinData.liquidity}
+مستوى المخاطرة: ${coinData.riskLevel}
+درجة الجودة المسبقة: ${coinData.preScore ?? 'N/A'}/10
 
-قدم إجابة بالصيغة التالية بالضبط:
+معايير الشراء الجيد:
+✅ السعر قريب من القاع (موضع < 40%)
+✅ الحجم متزايد مع سعر ثابت أو هابط قليلاً
+✅ تغير 24h بين -5% و +2%
+✅ سيولة عالية أو متوسطة
+❌ تجنب: pump واضح، حجم منخفض جداً، تغير > +5%
+
+أجب بالصيغة التالية حصراً:
 RECOMMENDED: [YES/NO]
 CONFIDENCE: [HIGH/MEDIUM/LOW]
-REASON: [سبب واحد رئيسي في سطر واحد]
-SUMMARY: [ملخص قصير جداً 10-15 كلمة]
+REASON: [سبب محدد وقصير]
+SUMMARY: [جملة واحدة تلخص الوضع]
 `;
 
   try {

@@ -6,7 +6,7 @@ import { AssetCard } from "@/components/AssetCard";
 import { PortfolioAnalysis } from "@/components/PortfolioAnalysis";
 import { AutoSearchPanel } from "@/components/AutoSearchPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X, Play, Square, AlertTriangle } from "lucide-react";
+import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X, AlertTriangle, Wallet, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/NavLink";
 import { useAutoSearch } from "@/contexts/AutoSearchContext";
@@ -14,6 +14,7 @@ import { assignProfitPercentsToExistingCoins, sortCoinsByProfitPercent } from "@
 import { addBuyRecord, getTradeHistory } from "@/services/tradeHistory";
 import { DUST_THRESHOLD } from "@/services/investmentBackupService";
 import { updateCachedBalance } from "@/services/binanceTrading";
+import { getBotConfig, setBotEnabled, runBotNow } from "@/services/botConfigService";
 import type { Session } from "@supabase/supabase-js";
 
 interface Balance {
@@ -47,7 +48,21 @@ const Index = () => {
   const { toast } = useToast();
   
   // 🔄 استخدام البحث التلقائي
-  const { isRunning, startAutoSearch, stopAutoSearch } = useAutoSearch();
+  useAutoSearch();
+
+  // 🤖 حالة البوت 24/7
+  const [botEnabled, setBotEnabledState] = useState(false);
+  const [botLoading, setBotLoading] = useState(false);
+  const [botLastRun, setBotLastRun] = useState<string | null>(null);
+
+  useEffect(() => {
+    getBotConfig().then(cfg => {
+      if (cfg) {
+        setBotEnabledState(cfg.enabled);
+        setBotLastRun(cfg.last_run || null);
+      }
+    });
+  }, []);
 
   // � التحقق من صلاحية مفتاح Groq API
   useEffect(() => {
@@ -97,16 +112,6 @@ const Index = () => {
     checkGroqApiKey();
   }, []);
 
-  // �🚀 تشغيل البحث التلقائي عند فتح الموقع
-  useEffect(() => {
-    if (!isRunning) {
-      console.log('🚀 تشغيل البحث التلقائي تلقائياً عند فتح الموقع...');
-      const timer = setTimeout(() => {
-        startAutoSearch();
-      }, 2000); // انتظر 2 ثانية للتأكد من تحميل كل شيء
-      return () => clearTimeout(timer);
-    }
-  }, []); // يعمل مرة واحدة فقط عند فتح الموقع
 
   useEffect(() => {
     // تحميل المحفظة مباشرة بدون Auth
@@ -153,9 +158,10 @@ const Index = () => {
       
       const credentials = JSON.parse(stored);
       
+      const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRweHVhY25ybmN3eW9wZWh3eHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNTE1ODksImV4cCI6MjA4MjkyNzU4OX0.1AIdMc4COv30K-XUL3zU6wHAZ_1JlCaNKpmOY90AXRk';
       const response = await fetch('https://dpxuacnrncwyopehwxsj.supabase.co/functions/v1/binance-portfolio', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}`, 'apikey': ANON_KEY },
         body: JSON.stringify({
           apiKey: credentials.apiKey,
           secretKey: credentials.secretKey
@@ -326,9 +332,10 @@ const Index = () => {
       
       const credentials = JSON.parse(stored);
       
+      const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRweHVhY25ybmN3eW9wZWh3eHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNTE1ODksImV4cCI6MjA4MjkyNzU4OX0.1AIdMc4COv30K-XUL3zU6wHAZ_1JlCaNKpmOY90AXRk';
       const response = await fetch('https://dpxuacnrncwyopehwxsj.supabase.co/functions/v1/binance-portfolio', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}`, 'apikey': ANON_KEY },
         body: JSON.stringify({
           apiKey: credentials.apiKey,
           secretKey: credentials.secretKey
@@ -364,107 +371,119 @@ const Index = () => {
   if (isLoading && !portfolio) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-crypto-gold mx-auto mb-4" />
-          <p className="text-muted-foreground font-orbitron">جاري تحميل المحفظة...</p>
+        <div className="text-center space-y-4">
+          <div className="relative mx-auto w-16 h-16">
+            <div className="absolute inset-0 rounded-full border-2 border-cyan-500/20 animate-pulse" />
+            <div className="absolute inset-0 rounded-full border-t-2 border-cyan-400 animate-spin" />
+            <div className="absolute inset-2 rounded-full border-t-2 border-emerald-400/60 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
+          </div>
+          <p className="font-mono text-sm text-white/40 uppercase tracking-[0.3em]">LOADING PORTFOLIO</p>
+          <div className="flex gap-1 justify-center">
+            {[0,1,2].map(i => (
+              <div key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400/50 animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8 animate-fade-in">
+    <div className="min-h-screen bg-background p-4 md:p-6 animate-fade-in">
       <div className="max-w-7xl mx-auto">
-        {/* ⚠️ تحذير مفتاح API */}
+
+        {/* API Key Warning */}
         {apiKeyError && (
-          <div className="mb-4 p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
+          <div className="mb-4 p-3.5 bg-yellow-500/8 border border-yellow-500/25 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-fade-in">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="w-6 h-6 text-yellow-500 flex-shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-yellow-500">⚠️ تحذير: {apiKeyError}</p>
-                <p className="text-sm text-muted-foreground">ChatGPT و Gemini لن يعملان - أنشئ مفتاح جديد من Groq</p>
+                <p className="text-sm font-mono text-yellow-400">{apiKeyError}</p>
+                <p className="text-xs font-mono text-white/30 mt-0.5">يمكنك إنشاء مفتاح جديد من Groq Console</p>
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2">
               <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">
-                <Button variant="default" size="sm" className="bg-green-600 hover:bg-green-700 whitespace-nowrap">
-                  🔑 إنشاء مفتاح جديد
+                <Button size="sm" className="bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-400 text-xs font-mono">
+                  مفتاح جديد
                 </Button>
               </a>
               <NavLink to="/settings">
-                <Button variant="outline" size="sm" className="border-yellow-500/50 hover:bg-yellow-500/20 whitespace-nowrap">
-                  <SettingsIcon className="w-4 h-4 mr-2" />
-                  الإعدادات
+                <Button variant="outline" size="sm" className="border-white/10 text-white/40 hover:text-white/60 text-xs font-mono">
+                  <SettingsIcon className="w-3.5 h-3.5 mr-1" />
+                  إعدادات
                 </Button>
               </NavLink>
             </div>
           </div>
         )}
 
-        <div className="mb-6 flex justify-between items-center gap-4 animate-fade-in flex-wrap animate-delay-100">
+        {/* Navigation Bar */}
+        <nav className="mb-6 flex justify-between items-center gap-3 flex-wrap animate-fade-in delay-100">
           <div className="flex gap-2">
             <NavLink to="/settings">
-              <Button variant="outline" className="gap-2 transition-all duration-300 hover:scale-105">
-                <SettingsIcon className="w-4 h-4" />
+              <Button variant="outline" size="sm" className="gap-2 bg-white/3 border-white/10 hover:bg-white/6 hover:border-white/20 text-white/50 hover:text-white/80 font-mono text-xs transition-all">
+                <SettingsIcon className="w-3.5 h-3.5" />
                 الإعدادات
               </Button>
             </NavLink>
             <NavLink to="/portfolio-rebalance">
-              <Button variant="outline" className="gap-2 transition-all duration-300 hover:scale-105 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30 hover:border-purple-500/50">
-                📊 موازنة المحفظة
+              <Button variant="outline" size="sm" className="gap-2 bg-purple-500/5 border-purple-500/20 hover:bg-purple-500/10 hover:border-purple-500/35 text-purple-400/70 hover:text-purple-400 font-mono text-xs transition-all">
+                موازنة المحفظة
               </Button>
             </NavLink>
           </div>
+
           <div className="flex gap-2">
-            {/* زر تشغيل/إيقاف البحث التلقائي */}
-            <Button 
-              onClick={() => {
-                if (isRunning) {
-                  stopAutoSearch();
+            {/* زر البوت 24/7 */}
+            <Button
+              onClick={async () => {
+                setBotLoading(true);
+                const result = await setBotEnabled(!botEnabled);
+                if (result.success) {
+                  setBotEnabledState(!botEnabled);
                   toast({
-                    title: "🔴 تم الإيقاف",
-                    description: "تم إيقاف البحث التلقائي",
+                    title: !botEnabled ? "🤖 البوت مفعّل!" : "البوت متوقف",
+                    description: !botEnabled
+                      ? "يعمل 24/7 على السيرفر — المتصفح غير مطلوب"
+                      : "توقف البوت على السيرفر",
                   });
                 } else {
-                  startAutoSearch();
-                  toast({
-                    title: "🟢 تم التشغيل",
-                    description: "البحث التلقائي يعمل الآن!",
-                  });
+                  toast({ title: "❌ خطأ", description: result.error, variant: "destructive" });
                 }
+                setBotLoading(false);
               }}
-              variant={isRunning ? "destructive" : "default"}
-              className={`gap-2 transition-all duration-300 hover:scale-105 ${isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+              disabled={botLoading}
+              size="sm"
+              className={`gap-2 font-mono text-xs transition-all ${
+                botEnabled
+                  ? 'bg-purple-500/20 border border-purple-500/40 text-purple-300 hover:bg-purple-500/30'
+                  : 'bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:bg-slate-500/15'
+              }`}
             >
-              {isRunning ? (
-                <>
-                  <Square className="w-4 h-4" />
-                  إيقاف البحث
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4" />
-                  تشغيل البحث ⚡
-                </>
-              )}
+              {botLoading
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <Server className="w-3 h-3" />}
+              {botEnabled ? 'بوت: مفعّل' : 'بوت 24/7'}
             </Button>
-            {/* زر إظهار/إخفاء لوحة التحكم */}
-            <Button 
+
+            <Button
               onClick={() => setShowAutoSearch(!showAutoSearch)}
               variant="outline"
-              className="gap-2 transition-all duration-300 hover:scale-105 border-primary/30 hover:border-primary/50"
+              size="sm"
+              className="gap-2 bg-cyan-500/5 border-cyan-500/20 hover:bg-cyan-500/10 hover:border-cyan-500/35 text-cyan-400/70 hover:text-cyan-400 font-mono text-xs transition-all"
             >
-              <Zap className="w-4 h-4" />
-              {showAutoSearch ? 'إخفاء' : 'التفاصيل'}
+              <Zap className="w-3 h-3" />
+              التفاصيل
             </Button>
             <NavLink to="/suggest-coins">
-              <Button className="gap-2 transition-all duration-300 hover:scale-105">
-                <Sparkles className="w-4 h-4" />
-                استكشاف عملات جديدة
+              <Button size="sm" className="gap-2 bg-cyan-500/15 border border-cyan-500/30 hover:bg-cyan-500/22 text-cyan-400 hover:text-cyan-300 font-mono text-xs transition-all">
+                <Sparkles className="w-3 h-3" />
+                اكتشاف عملات
               </Button>
             </NavLink>
           </div>
-        </div>
+        </nav>
         {/* لوحة البحث التلقائي */}
         {showAutoSearch && (
           <div className="mb-6 animate-fade-in">
@@ -507,24 +526,28 @@ const Index = () => {
               
               return (
                 <>
-                  <div className="mb-6">
-                    <h2 className="text-xl font-orbitron font-semibold mb-2 text-foreground">
-                      الأصول ({filteredBalances.length})
-                    </h2>
-                    {dustCount > 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        🧹 تم إخفاء {dustCount} عملة غبار (قيمة أقل من ${DUST_THRESHOLD})
-                      </p>
-                    )}
+                  <div className="mb-5 flex items-center justify-between">
+                    <div>
+                      <h2 className="font-mono text-xs text-white/30 uppercase tracking-[0.2em] mb-1">ASSETS</h2>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-lg font-bold text-white/80">{filteredBalances.length}</span>
+                        <span className="font-mono text-xs text-white/30">عملة نشطة</span>
+                        {dustCount > 0 && (
+                          <span className="font-mono text-[10px] text-yellow-400/50 border border-yellow-400/15 px-1.5 py-0.5 rounded">
+                            {dustCount} غبار مخفي
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="separator-glow w-40" />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                     {sortedBalances.map((balance, index) => (
-                      <div 
+                      <div
                         key={balance.asset}
-                        style={{ 
-                          animationDelay: `${index * 0.1}s`,
-                        }}
+                        className="animate-fade-in"
+                        style={{ animationDelay: `${index * 0.06}s` }}
                       >
                         <AssetCard
                           asset={balance.asset}
@@ -538,8 +561,11 @@ const Index = () => {
                   </div>
 
                   {filteredBalances.length === 0 && (
-                    <div className="text-center py-12">
-                      <p className="text-muted-foreground">لا توجد أصول في المحفظة</p>
+                    <div className="text-center py-16">
+                      <div className="w-12 h-12 rounded-full border border-white/8 bg-white/3 flex items-center justify-center mx-auto mb-3">
+                        <Wallet className="w-5 h-5 text-white/20" />
+                      </div>
+                      <p className="font-mono text-sm text-white/25">لا توجد أصول في المحفظة</p>
                     </div>
                   )}
                 </>

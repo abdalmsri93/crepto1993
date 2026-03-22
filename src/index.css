@@ -1,224 +1,437 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Noto+Kufi+Arabic:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 8% 8%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 8% 8%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 48 96% 53%;
-    --primary-foreground: 240 10% 3.9%;
-
-    --secondary: 142 76% 36%;
+    --background: 220 20% 4%;
+    --foreground: 210 20% 95%;
+    --card: 220 18% 7%;
+    --card-foreground: 210 20% 95%;
+    --popover: 220 18% 7%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 172 100% 50%;
+    --primary-foreground: 220 20% 4%;
+    --secondary: 142 76% 40%;
     --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 5% 15%;
-    --muted-foreground: 240 5% 64.9%;
-
-    --accent: 48 96% 53%;
-    --accent-foreground: 240 10% 3.9%;
-
-    --destructive: 0 72% 51%;
+    --muted: 220 15% 12%;
+    --muted-foreground: 220 10% 55%;
+    --accent: 172 100% 50%;
+    --accent-foreground: 220 20% 4%;
+    --destructive: 0 80% 58%;
     --destructive-foreground: 0 0% 98%;
-
-    --border: 240 6% 20%;
-    --input: 240 6% 20%;
-    --ring: 48 96% 53%;
-
-    --radius: 0.75rem;
-
-    --chart-1: 48 96% 53%;
-    --chart-2: 142 76% 36%;
-    --chart-3: 221 83% 53%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-
-    --crypto-gold: 48 96% 53%;
-    --crypto-green: 142 76% 36%;
-    --crypto-red: 0 72% 51%;
-    --crypto-blue: 221 83% 53%;
-    
-    --gradient-crypto: linear-gradient(135deg, hsl(48 96% 53% / 0.1), hsl(142 76% 36% / 0.1));
-    --glow-gold: 0 0 30px hsl(48 96% 53% / 0.3);
-    --glow-green: 0 0 30px hsl(142 76% 36% / 0.3);
+    --border: 220 15% 15%;
+    --input: 220 15% 12%;
+    --ring: 172 100% 50%;
+    --radius: 0.5rem;
+    --chart-1: 172 100% 50%;
+    --chart-2: 142 76% 40%;
+    --chart-3: 221 83% 60%;
+    --chart-4: 280 65% 65%;
+    --chart-5: 38 92% 58%;
+    --neon-cyan: 172 100% 50%;
+    --neon-green: 142 76% 45%;
+    --neon-red: 0 80% 58%;
+    --neon-gold: 38 92% 58%;
+    --neon-purple: 270 80% 65%;
+    --glow-cyan: 0 0 20px hsl(172 100% 50% / 0.4), 0 0 60px hsl(172 100% 50% / 0.2);
+    --glow-green: 0 0 20px hsl(142 76% 45% / 0.4), 0 0 60px hsl(142 76% 45% / 0.15);
+    --glow-red: 0 0 20px hsl(0 80% 58% / 0.4), 0 0 60px hsl(0 80% 58% / 0.15);
+    --glow-gold: 0 0 20px hsl(38 92% 58% / 0.4), 0 0 60px hsl(38 92% 58% / 0.15);
+    --grid-color: hsl(172 100% 50% / 0.035);
+    --scanline: hsl(172 100% 50% / 0.012);
+    --crypto-gold: 38 92% 58%;
+    --crypto-green: 142 76% 45%;
+    --crypto-red: 0 80% 58%;
+    --crypto-blue: 221 83% 60%;
+    --gradient-crypto: linear-gradient(135deg, hsl(172 100% 50% / 0.08), hsl(142 76% 45% / 0.08));
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 8% 8%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 8% 8%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 48 96% 53%;
-    --primary-foreground: 240 10% 3.9%;
-
-    --secondary: 142 76% 36%;
+    --background: 220 20% 4%;
+    --foreground: 210 20% 95%;
+    --card: 220 18% 7%;
+    --card-foreground: 210 20% 95%;
+    --popover: 220 18% 7%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 172 100% 50%;
+    --primary-foreground: 220 20% 4%;
+    --secondary: 142 76% 40%;
     --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 5% 15%;
-    --muted-foreground: 240 5% 64.9%;
-
-    --accent: 48 96% 53%;
-    --accent-foreground: 240 10% 3.9%;
-
-    --destructive: 0 72% 51%;
+    --muted: 220 15% 12%;
+    --muted-foreground: 220 10% 55%;
+    --accent: 172 100% 50%;
+    --accent-foreground: 220 20% 4%;
+    --destructive: 0 80% 58%;
     --destructive-foreground: 0 0% 98%;
-
-    --border: 240 6% 20%;
-    --input: 240 6% 20%;
-    --ring: 48 96% 53%;
+    --border: 220 15% 15%;
+    --input: 220 15% 12%;
+    --ring: 172 100% 50%;
   }
 }
 
 @layer base {
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Noto Kufi Arabic', 'Space Mono', sans-serif;
+    background-color: hsl(220, 20%, 4%);
+    overflow-x: hidden;
+    position: relative;
   }
-  
-  .font-orbitron {
-    font-family: 'Orbitron', sans-serif;
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid-color) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 44px 44px;
+    pointer-events: none;
+    z-index: 0;
   }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      var(--scanline) 2px,
+      var(--scanline) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+    animation: scanlines 10s linear infinite;
+  }
+
+  @keyframes scanlines {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  .font-orbitron { font-family: 'Space Mono', monospace; }
+  .font-mono-terminal { font-family: 'Space Mono', monospace; }
+
+  #root { position: relative; z-index: 1; }
 }
 
 @layer utilities {
-  .gradient-crypto {
-    background: var(--gradient-crypto);
+
+  .text-neon-cyan { color: hsl(var(--neon-cyan)); }
+  .text-neon-green { color: hsl(var(--neon-green)); }
+  .text-neon-red { color: hsl(var(--neon-red)); }
+  .text-neon-gold { color: hsl(var(--neon-gold)); }
+  .text-neon-purple { color: hsl(var(--neon-purple)); }
+  .bg-neon-cyan { background-color: hsl(var(--neon-cyan)); }
+  .bg-neon-green { background-color: hsl(var(--neon-green)); }
+
+  .text-crypto-gold { color: hsl(var(--neon-gold)); }
+  .text-crypto-green { color: hsl(var(--neon-green)); }
+  .text-crypto-red { color: hsl(var(--neon-red)); }
+  .bg-crypto-gold { background-color: hsl(var(--neon-gold)); }
+  .bg-crypto-green { background-color: hsl(var(--neon-green)); }
+
+  .glow-cyan { box-shadow: var(--glow-cyan); }
+  .glow-green { box-shadow: var(--glow-green); }
+  .glow-red { box-shadow: var(--glow-red); }
+  .glow-gold { box-shadow: var(--glow-gold); }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 10px hsl(172 100% 50% / 0.8), 0 0 30px hsl(172 100% 50% / 0.4);
   }
-  
-  .text-crypto-gold {
-    color: hsl(var(--crypto-gold));
+  .text-glow-green {
+    text-shadow: 0 0 10px hsl(142 76% 45% / 0.8), 0 0 30px hsl(142 76% 45% / 0.4);
   }
-  
-  .text-crypto-green {
-    color: hsl(var(--crypto-green));
-  }
-  
-  .text-crypto-red {
-    color: hsl(var(--crypto-red));
-  }
-  
-  .bg-crypto-gold {
-    background-color: hsl(var(--crypto-gold));
-  }
-  
-  .bg-crypto-green {
-    background-color: hsl(var(--crypto-green));
-  }
-  
-  .animate-glow-gold {
-    animation: glow-gold 2s ease-in-out infinite alternate;
-  }
-  
-  @keyframes glow-gold {
-    from {
-      box-shadow: var(--glow-gold);
-    }
-    to {
-      box-shadow: 0 0 40px hsl(48 96% 53% / 0.5);
-    }
-  }
-  
+
   .glass-card {
-    background: hsl(var(--card) / 0.4);
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--border) / 0.5);
-    box-shadow: 0 8px 32px 0 rgba(48, 96, 53, 0.1);
+    background: hsl(220 18% 7% / 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(172 100% 50% / 0.12);
+    box-shadow:
+      0 4px 24px hsl(220 20% 2% / 0.6),
+      inset 0 1px 0 hsl(172 100% 50% / 0.08);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  
+
   .glass-card:hover {
-    background: hsl(var(--card) / 0.6);
-    box-shadow: 0 8px 40px 0 rgba(48, 96, 53, 0.2);
-    border-color: hsl(var(--border) / 0.8);
+    background: hsl(220 18% 9% / 0.92);
+    border-color: hsl(172 100% 50% / 0.28);
+    box-shadow:
+      0 8px 40px hsl(220 20% 2% / 0.7),
+      0 0 20px hsl(172 100% 50% / 0.08),
+      inset 0 1px 0 hsl(172 100% 50% / 0.15);
+    transform: translateY(-2px);
   }
-  
-  /* تأثيرات الحركة */
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+
+  .terminal-card {
+    background: hsl(220 18% 6% / 0.95);
+    border: 1px solid hsl(172 100% 50% / 0.18);
+    border-top: 2px solid hsl(172 100% 50% / 0.5);
+    box-shadow:
+      0 0 0 1px hsl(220 20% 2% / 0.5),
+      0 4px 30px hsl(172 100% 50% / 0.06),
+      inset 0 1px 0 hsl(172 100% 50% / 0.1);
+    position: relative;
+    overflow: hidden;
   }
-  
-  @keyframes scaleIn {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
+
+  .terminal-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent,
+      hsl(172 100% 50% / 0.6) 30%,
+      hsl(172 100% 50% / 0.9) 50%,
+      hsl(172 100% 50% / 0.6) 70%,
+      transparent);
   }
-  
-  @keyframes slideInRight {
-    from {
-      opacity: 0;
-      transform: translateX(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
+
+  .asset-card {
+    background: hsl(220 18% 7% / 0.92);
+    border: 1px solid hsl(220 15% 14% / 0.8);
+    border-left: 3px solid hsl(172 100% 50% / 0.4);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
   }
-  
-  .animate-fade-in {
-    animation: fadeIn 0.6s ease-out forwards;
+
+  .asset-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, hsl(172 100% 50% / 0.03) 0%, transparent 60%);
+    pointer-events: none;
     opacity: 0;
+    transition: opacity 0.3s ease;
   }
-  
-  .animate-scale-in {
-    animation: scaleIn 0.5s ease-out forwards;
-    opacity: 0;
+
+  .asset-card:hover::after { opacity: 1; }
+
+  .asset-card:hover {
+    border-color: hsl(172 100% 50% / 0.25);
+    border-left-color: hsl(172 100% 50% / 0.85);
+    box-shadow:
+      4px 0 20px hsl(172 100% 50% / 0.08),
+      0 8px 30px hsl(220 20% 2% / 0.5);
+    transform: translateX(-2px);
   }
-  
-  .animate-slide-in-right {
-    animation: slideInRight 0.6s ease-out forwards;
+
+  .asset-card-positive { border-left-color: hsl(142 76% 45% / 0.5); }
+  .asset-card-positive:hover {
+    border-left-color: hsl(142 76% 45% / 1);
+    box-shadow: 4px 0 20px hsl(142 76% 45% / 0.1), 0 8px 30px hsl(220 20% 2% / 0.5);
   }
-  
-  /* تأثيرات النصوص */
+
+  .asset-card-negative { border-left-color: hsl(0 80% 58% / 0.45); }
+  .asset-card-negative:hover {
+    border-left-color: hsl(0 80% 58% / 0.9);
+    box-shadow: 4px 0 20px hsl(0 80% 58% / 0.1), 0 8px 30px hsl(220 20% 2% / 0.5);
+  }
+
   .text-gradient {
-    background: linear-gradient(135deg, hsl(48 96% 53%), hsl(142 76% 36%));
+    background: linear-gradient(135deg, hsl(172 100% 55%), hsl(142 76% 45%));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  
-  /* تحسينات الزرار */
-  .btn-primary {
-    @apply bg-gradient-to-r from-crypto-gold to-crypto-green text-foreground font-semibold px-6 py-3 rounded-lg transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95;
+
+  .text-gradient-gold {
+    background: linear-gradient(135deg, hsl(38 92% 68%), hsl(38 92% 48%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
-  
+
+  .gradient-crypto {
+    background: linear-gradient(135deg, hsl(172 100% 50% / 0.08), hsl(142 76% 45% / 0.08));
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: hsl(142 76% 50%);
+    box-shadow: 0 0 8px hsl(142 76% 50% / 0.9);
+    display: inline-block;
+    animation: livePulse 2s ease-in-out infinite;
+  }
+
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px hsl(142 76% 50% / 0.9); }
+    50% { opacity: 0.5; box-shadow: 0 0 18px hsl(142 76% 50% / 0.3); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+
+  @keyframes glow-gold {
+    from { box-shadow: var(--glow-gold); }
+    to { box-shadow: 0 0 40px hsl(38 92% 58% / 0.5); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+  }
+
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  .animate-glow-gold {
+    animation: glow-gold 2s ease-in-out infinite alternate;
+  }
+
+  .animate-float { animation: float 4s ease-in-out infinite; }
+  .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
+
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent 0%, hsl(172 100% 50% / 0.1) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  .animate-ticker {
+    animation: ticker-scroll 20s linear infinite;
+    white-space: nowrap;
+  }
+
+  .delay-100 { animation-delay: 0.1s; }
+  .delay-200 { animation-delay: 0.2s; }
+  .delay-300 { animation-delay: 0.3s; }
+  .delay-400 { animation-delay: 0.4s; }
+  .delay-500 { animation-delay: 0.5s; }
+  .delay-600 { animation-delay: 0.6s; }
+  .delay-700 { animation-delay: 0.7s; }
+  .delay-800 { animation-delay: 0.8s; }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: hsl(220 20% 4%); }
+  ::-webkit-scrollbar-thumb { background: hsl(172 100% 50% / 0.25); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(172 100% 50% / 0.45); }
+
+  .stat-number {
+    font-family: 'Space Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .separator-glow {
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent,
+      hsl(172 100% 50% / 0.4) 30%,
+      hsl(172 100% 50% / 0.6) 50%,
+      hsl(172 100% 50% / 0.4) 70%,
+      transparent);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, hsl(172 100% 38%), hsl(172 100% 32%));
+    color: hsl(220 20% 4%);
+    font-weight: 700;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.05em;
+    border: 1px solid hsl(172 100% 50% / 0.4);
+    box-shadow: 0 0 18px hsl(172 100% 50% / 0.18);
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0 28px hsl(172 100% 50% / 0.35);
+    transform: translateY(-1px);
+  }
+
   .btn-secondary {
-    @apply border-2 border-crypto-gold text-crypto-gold font-semibold px-6 py-3 rounded-lg transition-all duration-300 hover:bg-crypto-gold hover:text-foreground active:scale-95;
+    background: transparent;
+    color: hsl(172 100% 55%);
+    font-family: 'Space Mono', monospace;
+    border: 1px solid hsl(172 100% 50% / 0.28);
+    transition: all 0.2s ease;
+  }
+
+  .btn-secondary:hover {
+    background: hsl(172 100% 50% / 0.07);
+    border-color: hsl(172 100% 50% / 0.55);
+    box-shadow: 0 0 18px hsl(172 100% 50% / 0.12);
+  }
+
+  .corner-tl { position: relative; }
+  .corner-tl::before {
+    content: '';
+    position: absolute;
+    top: 5px; left: 5px;
+    width: 12px; height: 12px;
+    border-top: 1px solid hsl(172 100% 50% / 0.5);
+    border-left: 1px solid hsl(172 100% 50% / 0.5);
+    pointer-events: none;
+  }
+
+  .corner-br { position: relative; }
+  .corner-br::after {
+    content: '';
+    position: absolute;
+    bottom: 5px; right: 5px;
+    width: 12px; height: 12px;
+    border-bottom: 1px solid hsl(172 100% 50% / 0.5);
+    border-right: 1px solid hsl(172 100% 50% / 0.5);
+    pointer-events: none;
   }
 }
