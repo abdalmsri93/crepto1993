@@ -3,12 +3,9 @@
  * تنقل الإعدادات من localStorage إلى الجدول حتى يعمل البوت بدون متصفح
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
 const SUPABASE_URL = 'https://dpxuacnrncwyopehwxsj.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRweHVhY25ybmN3eW9wZWh3eHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNTE1ODksImV4cCI6MjA4MjkyNzU4OX0.1AIdMc4COv30K-XUL3zU6wHAZ_1JlCaNKpmOY90AXRk';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export interface BotConfig {
   enabled: boolean;

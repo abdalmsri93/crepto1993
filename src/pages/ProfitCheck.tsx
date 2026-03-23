@@ -181,7 +181,7 @@ export default function ProfitCheck() {
             {coins.map((coin) => (
               <div 
                 key={coin.coin}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted"
               >
                 <div className="flex items-center gap-3">
                   {getStatusIcon(coin.hasProfit, coin.hasInvestment)}
@@ -241,7 +241,7 @@ export default function ProfitCheck() {
       </Card>
 
       {/* Legend */}
-      <Card className="bg-gray-50">
+      <Card className="bg-card border">
         <CardContent className="pt-6">
           <div className="text-sm space-y-2">
             <div className="font-bold mb-3">دليل الحالات:</div>
