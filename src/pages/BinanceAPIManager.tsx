@@ -92,34 +92,24 @@ const BinanceAPIManager = () => {
 
       setIsLoading(true);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session found");
 
-      // حساب hash للمفتاح
-      const encoder = new TextEncoder();
-      const data = encoder.encode(apiKey);
-      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+      // استدعاء Edge Function لتشفير AES وحفظ المفاتيح
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://dpxuacnrncwyopehwxsj.supabase.co';
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/save-binance-keys`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ apiKey, secretKey }),
+      });
 
-      // في بيئة إنتاجية، يجب تشفير المفاتيح هنا
-      // هذا كود توضيحي فقط
-      const encryptedApiKey = btoa(apiKey);
-      const encryptedSecretKey = btoa(secretKey);
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'فشل حفظ المفاتيح');
 
-      const { error } = await supabase
-        .from("encrypted_binance_keys" as any)
-        .insert({
-          user_id: user.id,
-          encrypted_api_key: encryptedApiKey,
-          encrypted_secret_key: encryptedSecretKey,
-          api_key_hash: hashHex,
-          is_active: true,
-        } as any);
-
-      if (error) throw error;
-
-      // حفظ المفاتيح في localStorage أيضاً للاستخدام المحلي
+      // حفظ المفاتيح في localStorage للاستخدام المحلي
       localStorage.setItem('binance_credentials', JSON.stringify({
         apiKey: apiKey,
         secretKey: secretKey
@@ -127,7 +117,7 @@ const BinanceAPIManager = () => {
 
       // تسجيل النشاط
       await supabase.from("encryption_logs" as any).insert({
-        user_id: user.id,
+        user_id: session.user.id,
         action: "add_key",
         success: true,
       } as any);

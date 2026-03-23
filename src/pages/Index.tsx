@@ -168,27 +168,24 @@ const Index = () => {
       // قراءة المفاتيح من localStorage
       let stored = localStorage.getItem('binance_credentials');
 
-      // إذا ما لقينا مفاتيح في localStorage، نحاول نجيبهم من Supabase
+      // إذا ما لقينا مفاتيح في localStorage، نحاول نجيبهم من Edge Function (AES)
       if (!stored) {
         console.log('🔍 محاولة استعادة المفاتيح من Supabase...');
         try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const { data: keyData } = await supabase
-              .from("encrypted_binance_keys" as any)
-              .select("encrypted_api_key, encrypted_secret_key")
-              .eq("user_id", user.id)
-              .eq("is_active", true)
-              .single();
-
-            if (keyData && (keyData as any).encrypted_api_key && (keyData as any).encrypted_secret_key) {
-              const restoredCreds = {
-                apiKey: atob((keyData as any).encrypted_api_key),
-                secretKey: atob((keyData as any).encrypted_secret_key)
-              };
-              localStorage.setItem('binance_credentials', JSON.stringify(restoredCreds));
-              stored = JSON.stringify(restoredCreds);
-              console.log('✅ تم استعادة المفاتيح من Supabase');
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://dpxuacnrncwyopehwxsj.supabase.co';
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/get-binance-keys`, {
+              headers: { 'Authorization': `Bearer ${session.access_token}` }
+            });
+            if (res.ok) {
+              const { apiKey, secretKey } = await res.json();
+              if (apiKey && secretKey) {
+                const restoredCreds = { apiKey, secretKey };
+                localStorage.setItem('binance_credentials', JSON.stringify(restoredCreds));
+                stored = JSON.stringify(restoredCreds);
+                console.log('✅ تم استعادة المفاتيح من Supabase');
+              }
             }
           }
         } catch (e) {

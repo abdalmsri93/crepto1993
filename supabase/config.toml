@@ -47,3 +47,9 @@ verify_jwt = false
 
 [functions.test-ticker]
 verify_jwt = false
+
+[functions.save-binance-keys]
+verify_jwt = false
+
+[functions.get-binance-keys]
+verify_jwt = false

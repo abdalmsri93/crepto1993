@@ -5,6 +5,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { decryptAES } from '../_shared/aes.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -260,8 +261,11 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { binance_api_key: apiKey, binance_secret_key: secretKey, groq_api_key: groqKey,
-            profit_percent: profitPercent, max_portfolio_coins: maxCoins } = config;
+    const encKey = Deno.env.get('BINANCE_ENCRYPTION_KEY')!;
+    const encIv = Deno.env.get('BINANCE_ENCRYPTION_IV')!;
+    const apiKey = await decryptAES(config.binance_api_key, encKey, encIv);
+    const secretKey = await decryptAES(config.binance_secret_key, encKey, encIv);
+    const { groq_api_key: groqKey, profit_percent: profitPercent, max_portfolio_coins: maxCoins } = config;
 
     log(`🤖 بدء دورة البوت | هدف الربح: ${profitPercent}% | أقصى عملات: ${maxCoins}`);
 
