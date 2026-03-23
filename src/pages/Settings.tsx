@@ -160,16 +160,13 @@ const Settings = () => {
     }
     setIsTestingBinance(true);
     try {
-      // حفظ المفاتيح مؤقتاً في localStorage للاختبار
+      // حفظ المفاتيح في localStorage
       const tempCredentials = { apiKey: binanceApiKey.trim(), secretKey: binanceApiSecret.trim() };
-      const prev = localStorage.getItem('binance_credentials');
       localStorage.setItem('binance_credentials', JSON.stringify(tempCredentials));
 
       const balance = await getUSDTBalance();
 
-      // استعادة القيمة القديمة إذا كانت موجودة
-      if (prev) localStorage.setItem('binance_credentials', prev);
-
+      // الاختبار نجح - المفاتيح محفوظة بالفعل
       toast({
         title: "✅ المفاتيح صحيحة!",
         description: `تم الاتصال بـ Binance بنجاح — رصيد USDT: $${balance.toFixed(2)}`,

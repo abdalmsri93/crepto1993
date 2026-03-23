@@ -147,7 +147,36 @@ const Index = () => {
       console.log('Fetching portfolio data...');
       
       // قراءة المفاتيح من localStorage
-      const stored = localStorage.getItem('binance_credentials');
+      let stored = localStorage.getItem('binance_credentials');
+
+      // إذا ما لقينا مفاتيح في localStorage، نحاول نجيبهم من Supabase
+      if (!stored) {
+        console.log('🔍 محاولة استعادة المفاتيح من Supabase...');
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: keyData } = await supabase
+              .from("encrypted_binance_keys" as any)
+              .select("encrypted_api_key, encrypted_secret_key")
+              .eq("user_id", user.id)
+              .eq("is_active", true)
+              .single();
+
+            if (keyData && (keyData as any).encrypted_api_key && (keyData as any).encrypted_secret_key) {
+              const restoredCreds = {
+                apiKey: atob((keyData as any).encrypted_api_key),
+                secretKey: atob((keyData as any).encrypted_secret_key)
+              };
+              localStorage.setItem('binance_credentials', JSON.stringify(restoredCreds));
+              stored = JSON.stringify(restoredCreds);
+              console.log('✅ تم استعادة المفاتيح من Supabase');
+            }
+          }
+        } catch (e) {
+          console.error('فشل استعادة المفاتيح من Supabase:', e);
+        }
+      }
+
       if (!stored) {
         console.log('⚠️ لا توجد مفاتيح API');
         setConnectionStatus('disconnected');
@@ -155,7 +184,7 @@ const Index = () => {
         setIsLoading(false);
         return;
       }
-      
+
       const credentials = JSON.parse(stored);
       
       const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRweHVhY25ybmN3eW9wZWh3eHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNTE1ODksImV4cCI6MjA4MjkyNzU4OX0.1AIdMc4COv30K-XUL3zU6wHAZ_1JlCaNKpmOY90AXRk';

@@ -48,13 +48,29 @@ const BinanceAPIManager = () => {
 
       const { data, error } = await supabase
         .from("encrypted_binance_keys" as any)
-        .select("id, encrypted_api_key, api_key_hash, is_active, created_at, last_used")
+        .select("id, encrypted_api_key, encrypted_secret_key, api_key_hash, is_active, created_at, last_used")
         .eq("user_id", user.id)
         .eq("is_active", true)
         .single();
 
       if (data) {
         setSavedKeys((data as any) || []);
+
+        // استعادة المفاتيح في localStorage إذا مش موجودة
+        const existing = localStorage.getItem('binance_credentials');
+        if (!existing && (data as any).encrypted_api_key && (data as any).encrypted_secret_key) {
+          try {
+            const restoredApiKey = atob((data as any).encrypted_api_key);
+            const restoredSecretKey = atob((data as any).encrypted_secret_key);
+            localStorage.setItem('binance_credentials', JSON.stringify({
+              apiKey: restoredApiKey,
+              secretKey: restoredSecretKey
+            }));
+            console.log('🔑 تم استعادة المفاتيح من Supabase إلى localStorage');
+          } catch (e) {
+            console.error('فشل في استعادة المفاتيح:', e);
+          }
+        }
       }
     } catch (error) {
       console.log("No API keys found");
@@ -102,6 +118,12 @@ const BinanceAPIManager = () => {
         } as any);
 
       if (error) throw error;
+
+      // حفظ المفاتيح في localStorage أيضاً للاستخدام المحلي
+      localStorage.setItem('binance_credentials', JSON.stringify({
+        apiKey: apiKey,
+        secretKey: secretKey
+      }));
 
       // تسجيل النشاط
       await supabase.from("encryption_logs" as any).insert({
