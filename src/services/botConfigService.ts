@@ -4,7 +4,7 @@
  */
 
 const SUPABASE_URL = 'https://dpxuacnrncwyopehwxsj.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRweHVhY25ybmN3eW9wZWh3eHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQyODUyNjIsImV4cCI6MjA0OTg2MTI2Mn0.cN5y3IvxZmE4aB0FXiWsN3h1sQT_m_OscmQCBtF7aXY';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRweHVhY25ybmN3eW9wZWh3eHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNTE1ODksImV4cCI6MjA4MjkyNzU4OX0.1AIdMc4COv30K-XUL3zU6wHAZ_1JlCaNKpmOY90AXRk';
 
 export interface BotConfig {
   enabled: boolean;
