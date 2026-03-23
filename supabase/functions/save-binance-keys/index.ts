@@ -55,15 +55,15 @@ Deno.serve(async (req) => {
       is_active: true,
     }, { onConflict: 'user_id' });
 
-    // حفظ في bot_config (مشفر)
+    // حفظ في bot_config (مشفر) - upsert بناءً على user_id
     const { error: configError } = await supabase
       .from('bot_config')
-      .update({
+      .upsert({
+        user_id: user.id,
         binance_api_key: encryptedApiKey,
         binance_secret_key: encryptedSecretKey,
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', 1);
+      }, { onConflict: 'user_id' });
 
     if (configError) {
       console.error('bot_config update error:', configError);

@@ -239,26 +239,25 @@ Deno.serve(async (req: Request) => {
   const log = (msg: string) => { logs.push(`[${new Date().toISOString().slice(11,19)}] ${msg}`); console.log(msg); };
 
   try {
-    // 1. قراءة الإعدادات من Supabase
-    const { data: config, error: configErr } = await supabase
-      .from('bot_config').select('*').eq('id', 1).single();
+    // 1. قراءة إعدادات جميع المستخدمين المفعّلين
+    const { data: configs, error: configErr } = await supabase
+      .from('bot_config').select('*').eq('enabled', true);
 
-    if (configErr || !config) {
-      return new Response(JSON.stringify({ success: false, error: 'لم يتم إعداد البوت' }), {
+    if (configErr || !configs || configs.length === 0) {
+      return new Response(JSON.stringify({ success: false, error: 'لا يوجد بوت مفعّل' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    if (!config.enabled) {
-      return new Response(JSON.stringify({ success: false, error: 'البوت معطّل' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    const allResults = [];
+
+    for (const config of configs) {
+    logs.length = 0; // تصفير اللوق لكل مستخدم
 
     if (!config.binance_api_key || !config.binance_secret_key) {
-      return new Response(JSON.stringify({ success: false, error: 'مفاتيح Binance غير موجودة' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      logs.push(`⚠️ مفاتيح Binance غير موجودة للمستخدم ${config.user_id}`);
+      allResults.push({ user_id: config.user_id, success: false, error: 'مفاتيح غير موجودة' });
+      continue;
     }
 
     const encKey = Deno.env.get('BINANCE_ENCRYPTION_KEY')!;
@@ -275,7 +274,7 @@ Deno.serve(async (req: Request) => {
 
     if (portfolioCount >= maxCoins) {
       log(`⛔ المحفظة ممتلئة — لا شراء جديد`);
-      await supabase.from('bot_config').update({ last_run: new Date().toISOString(), last_log: logs.join('\n') }).eq('id', 1);
+      await supabase.from('bot_config').update({ last_run: new Date().toISOString(), last_log: logs.join('\n') }).eq('user_id', config.user_id);
       return new Response(JSON.stringify({ success: true, message: 'المحفظة ممتلئة', logs }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -288,7 +287,7 @@ Deno.serve(async (req: Request) => {
 
     if (usdtBalance < 5) {
       log(`⛔ الرصيد غير كافٍ`);
-      await supabase.from('bot_config').update({ last_run: new Date().toISOString(), last_log: logs.join('\n') }).eq('id', 1);
+      await supabase.from('bot_config').update({ last_run: new Date().toISOString(), last_log: logs.join('\n') }).eq('user_id', config.user_id);
       return new Response(JSON.stringify({ success: true, message: 'رصيد غير كافٍ', logs }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -330,7 +329,7 @@ Deno.serve(async (req: Request) => {
 
     if (scored.length === 0) {
       log(`😴 لا توجد عملات مناسبة الآن`);
-      await supabase.from('bot_config').update({ last_run: new Date().toISOString(), last_log: logs.join('\n') }).eq('id', 1);
+      await supabase.from('bot_config').update({ last_run: new Date().toISOString(), last_log: logs.join('\n') }).eq('user_id', config.user_id);
       return new Response(JSON.stringify({ success: true, message: 'لا توجد فرص الآن', logs }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -398,20 +397,19 @@ Deno.serve(async (req: Request) => {
       last_run: new Date().toISOString(),
       last_log: logs.join('\n'),
       updated_at: new Date().toISOString(),
-    }).eq('id', 1);
+    }).eq('user_id', config.user_id);
 
-    log(`✅ انتهت الدورة`);
+    log(`✅ انتهت الدورة للمستخدم ${config.user_id}`);
+    allResults.push({ user_id: config.user_id, success: true, bought, logs: [...logs] });
 
-    return new Response(JSON.stringify({ success: true, bought, logs }), {
+    } // نهاية loop المستخدمين
+
+    return new Response(JSON.stringify({ success: true, results: allResults }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (err: any) {
     console.error('❌ خطأ في البوت:', err);
-    await supabase.from('bot_config').update({
-      last_run: new Date().toISOString(),
-      last_log: `❌ خطأ: ${err.message}`,
-    }).eq('id', 1).catch(() => {});
     return new Response(JSON.stringify({ success: false, error: err.message }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
