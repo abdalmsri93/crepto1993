@@ -23,3 +23,27 @@ verify_jwt = false
 
 [functions.margin-order]
 verify_jwt = false
+
+[functions.auto-trade]
+verify_jwt = false
+
+[functions.binance-trade]
+verify_jwt = false
+
+[functions.binance-sell]
+verify_jwt = false
+
+[functions.binance-convert]
+verify_jwt = false
+
+[functions.suggest-coins-live]
+verify_jwt = false
+
+[functions.advanced-analysis]
+verify_jwt = false
+
+[functions.trade-history]
+verify_jwt = false
+
+[functions.test-ticker]
+verify_jwt = false
