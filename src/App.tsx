@@ -17,6 +17,8 @@ import ConfirmEmail from "./pages/ConfirmEmail";
 import Favorites from "./pages/Favorites";
 import TradeHistory from "./pages/TradeHistory";
 import ProfitCheck from "./pages/ProfitCheck";
+import BinanceAPIManager from "./pages/BinanceAPIManager";
+import TradingSettings from "./pages/TradingSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +44,8 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/trade-history" element={<TradeHistory />} />
             <Route path="/profit-check" element={<ProfitCheck />} />
+            <Route path="/binance-api" element={<BinanceAPIManager />} />
+            <Route path="/trading-settings" element={<TradingSettings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
