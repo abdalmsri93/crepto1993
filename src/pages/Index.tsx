@@ -6,7 +6,7 @@ import { AssetCard } from "@/components/AssetCard";
 import { PortfolioAnalysis } from "@/components/PortfolioAnalysis";
 import { AutoSearchPanel } from "@/components/AutoSearchPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X, AlertTriangle, Wallet, Server } from "lucide-react";
+import { Loader2, Sparkles, Settings as SettingsIcon, CheckCircle, Zap, X, AlertTriangle, Wallet, Server, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/NavLink";
 import { useAutoSearch } from "@/contexts/AutoSearchContext";
@@ -48,7 +48,26 @@ const Index = () => {
   const { toast } = useToast();
   
   // 🔄 استخدام البحث التلقائي
-  useAutoSearch();
+  const { stopAutoSearch, isRunning: autoSearchRunning } = useAutoSearch();
+
+  // 🛑 زر الإيقاف الطارئ (لوكل فقط)
+  const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const [localStopped, setLocalStopped] = useState(false);
+
+  const handleEmergencyStop = () => {
+    // 1️⃣ إيقاف البحث التلقائي
+    stopAutoSearch();
+    // 2️⃣ إيقاف الشراء التلقائي
+    localStorage.setItem('binance_auto_buy_enabled', 'false');
+    // 3️⃣ تعطيل البحث التلقائي
+    localStorage.setItem('auto_search_enabled', 'false');
+    setLocalStopped(true);
+    toast({
+      title: "🛑 تم إيقاف اللوكل",
+      description: "⚠️ البوت 24/7 على السيرفر لا يزال يعمل",
+      variant: "destructive",
+    });
+  };
 
   // 🤖 حالة البوت 24/7
   const [botEnabled, setBotEnabledState] = useState(false);
@@ -464,6 +483,22 @@ const Index = () => {
           </div>
 
           <div className="flex gap-2">
+            {/* 🛑 زر الإيقاف الطارئ - لوكل فقط */}
+            {isLocalEnv && (
+              <Button
+                onClick={handleEmergencyStop}
+                size="sm"
+                className={`gap-2 font-mono text-xs transition-all ${
+                  localStopped
+                    ? 'bg-green-500/20 border border-green-500/40 text-green-300'
+                    : 'bg-red-500/20 border border-red-500/40 text-red-300 hover:bg-red-500/30'
+                }`}
+              >
+                <ShieldOff className="w-3 h-3" />
+                {localStopped ? 'موقوف ✓' : 'إيقاف لوكل'}
+              </Button>
+            )}
+
             {/* زر البوت 24/7 */}
             <Button
               onClick={async () => {
